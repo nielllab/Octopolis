@@ -1,0 +1,30 @@
+gene name,ocbim,RNA sequence,population,,color label
+synaptotagmin,Ocbimv22021175,,neurons,,G
+VAchT,Ocbimv22001681,,cholinergic neurons,,R
+ChaT,Ocbimv22001674,,cholinergic neurons,,G
+VGlut,Ocbimv22024718,,glutamatergic neurons,,R
+TH,Ocbimv22017369,,dopaminergic neurons (and pigment?),,R
+DAT,Ocbimv22026818,,just dopaminergic?,,G
+VMAT-A,Ocbimv22031489,,monoamine transporter,,G
+FMRF-related peptide,Ocbimv22023842,,peptide transmission,,R
+FMRF-amide,Ocbimv22001324,,distinct from FRMF-related peptide,,R
+TyrBH,Ocbimv22031264,,Octopamine,,R
+AchE,Ocbimv22038398,,glia?,,R
+GAD,Ocbimv22028172,,"not present in lobe, good negative control! (should be elsewhere in brain)",,G
+cadherin,Ocbimv22003827,,Cadherin specific to octopaminergic,,G
+Cadherin,Ocbimv22025965,,relatively specific to glutamatergic neurons,,G
+Cadherin,Ocbimv22000175,,relatively specific,,G
+Scarecrow/Hox,Ocbimv22022773,,"relatively specific transcription factor, same as Nkx2.1",,R
+Nkx2.1/Hox,Ocbimv22033333,,relatively specific transcription factor,,G
+Sox,Ocbimv22024292,,relatively specific to TH neurons,,G
+Grik1L,Ocbimv22003892,,"glutamate receptor, specific expression",,G
+GluR4,Ocbimv22024411,,"glutamate receptor, specific expresson",,G
+Anionic AchR,Ocbimv22018197,,relatively specific to tyrBH neurons,,G
+AchR,Ocbimv22000748,,relatively specific to TH neurons,,G
+,,,,,
+,,,,,
+,,,,,
+,,,,,
+,,,,,
+Cadherin,Ocbimv22003826,,relatively specific,,G
+AchR,Ocbimv22009305,,expressed across most neurons,,G
