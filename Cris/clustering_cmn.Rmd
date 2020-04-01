@@ -433,6 +433,31 @@ DoHeatmap(all.normTREE, features = all.genes[genelist],disp.min = -1.5, disp.max
 DotPlot(all.normTREE,features=rev(all.genes[genelist])) + RotatedAxis()
 ```
 ```{r}
+
+#heatmap of yfg (your favorite gene)
+
+yfg <- read.csv("D:/data/octo seq/GeneIDs - More Neuro.csv",stringsAsFactors=FALSE)
+
+genelist <- vector()
+nomatch <- list()
+for (i in 1:205){
+  gene <- yfg[[i,2]]
+#gene<-substr(gene,1,str_length(gene)-1)
+  loc <- grep(gene,all.genes)
+  if (length(loc)>0) {
+    genelist <- c(genelist,loc)
+  } else {
+    nomatch <- c(nomatch,yfg[[i,2]])
+  }
+}
+DotPlot(all.normTREE,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 4))
+
+
+
+```
+
+
+```{r}
 zinc <- grep("c2h2",all.genes,ignore.case=TRUE)
 DotPlot(all.normTREE,features=rev(all.genes[zinc[1:500]])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 4))
 
@@ -445,6 +470,9 @@ DotPlot(all.normTREE,features=rev(all.genes[zinc[1001:1500]])) + RotatedAxis()+ 
 #krab c2h2 zinc fingers are noted in albertin et al. probably not getting them all
 DotPlot(all.normTREE,features=all.genes[grep("krab",all.genes,ignore.case=TRUE)]) + RotatedAxis()+ theme(axis.text.x = element_text(size = 4))
 ```
+```{r}
+DotPlot(all.normTREE,features=all.genes[grep("hox",all.genes,ignore.case=TRUE)]) + RotatedAxis()+ theme(axis.text.x = element_text(size = 4))
+```
 
 ```{r}
 cadh <-grep("cadherin",all.genes,ignore.case=TRUE)
@@ -452,7 +480,6 @@ DotPlot(all.normTREE,features=all.genes[cadh[1:100]]) + RotatedAxis()+ theme(axi
 
 DotPlot(all.normTREE,features=all.genes[cadh[101:193]]) + RotatedAxis()+ theme(axis.text.x = element_text(size = 4))
 
-```
 ```
 
 ```{r}
