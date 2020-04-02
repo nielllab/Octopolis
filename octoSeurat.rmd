@@ -1,0 +1,321 @@
+library(dplyr)
+library(Seurat)
+library(Matrix)
+library(ggplot2)
+library(sctransform)
+library(stringr)
+
+
+
+# Set working directory
+# TODO - choose something standard? e.g "C:/Data/OctoSeq/cellranger"
+setwd("C:/Users/User/Documents/MillerLab/cellranger")
+
+#=================
+# set parameters
+
+#new GTF (OctoGENES) vs old (Ocbimv)
+useOctoGene <- TRUE   
+
+# reassign gene names based on reference namekey?
+assignGeneIDs <- TRUE  
+
+# normalize using scTransform?
+useScTransform <- FALSE  
+
+# if more than one data set, use CCA-based integration (as opposed to standard merge)
+useIntegrateData <- FALSE 
+
+# number of PCAs to use for clustering and featureplots
+nPCAs = 20
+
+#list of cellranger data files
+dataFiles = c(""raw_feature_bc_matrix_Hisat3")
+
+#======================
+# TODO - for loop to encapsulate from reading data through normalizing
+
+# Load the Octo dataset
+octo.data <- Read10X(data.dir = "raw_feature_bc_matrix_Hisat3")
+
+# TODO - if statement for octoGene option
+#Read in namekey--has OCTOGene and ocbimv names
+ref <- read.csv("cov4_len200_splice3_strandness_gtf_namekey_singled_edited.csv",stringsAsFactors=FALSE)
+ngenes <- length(octo.data@Dimnames[[1]])
+
+#Combine Hisat names (OCTOgene) with Ocbimv names
+#NOTE: this step can take some time, but only has to be run once if you save
+for (g in 1:ngenes){
+  gene<-octo.data@Dimnames[[1]][g]
+  ind<-grep(gene,ref[[1]])
+  unlist(ind)
+  if (length(ind)>0) {
+    id <- ref[[ind[1],2]]
+    if (str_length(id)>0) {
+      octo.data@Dimnames[[1]][g]<- paste(id,gene,sep='-')
+    }
+  }
+}
+
+#Replace underscores with dashes within names
+for (g in 1:ngenes){
+  gene<-octo.data@Dimnames[[1]][g]
+  new<-str_replace_all(gene, "_", "-")
+  octo.data@Dimnames[[1]][g]<- paste(new)
+}
+
+#Save here
+saveRDS(octo.data, file = "D:/cellranger/octoData_onlyHisatNames.rds")
+
+#=========================================================
+
+#Read in if exited RStudio after running above code
+octo.data <- readRDS(file = "D:/cellranger/octoData_shortNames.rds")
+
+#Read in "real" gene names
+#All mitochondrial annotations were changed to "mitochondria"
+ref <- read.csv("miniNCBI_annotations_alltomitochondria1.csv",stringsAsFactors=FALSE)
+ref <- read.csv("refMaster.csv",stringsAsFactors=FALSE)
+ngenes <- length(octo.data@Dimnames[[1]])
+
+#Remove parentheses from names (messes up the gene names as dimensions)
+ref <- lapply(ref, gsub, pattern='\\(', replacement='')
+ref <- lapply(ref, gsub, pattern='\\)', replacement='')
+ref <- lapply(ref, gsub, pattern='_', replacement='-')
+ref$id = substr(ref$id,1,10)
+
+
+#Add on real gene names
+#NOTE: this step can take some time, but only has to be run once if you save
+ref2<-data.frame(ref)
+for (g in 1:ngenes){
+  gene<-octo.data@Dimnames[[1]][g]
+  unlistgene<-unlist(strsplit(gene,"-"))
+  geneList<-list()
+  for(i in unlistgene){
+    beginning<- substr(i, 0, 6)
+    if(beginning == "Ocbimv"){
+      ind<-grep(i,ref2$ncbi)
+      idlist<-list(droplevels(factor(ref2$id[ind])))
+      geneList<-c(geneList,idlist)
+      octo.data@Dimnames[[1]][g] <- (paste(gene,(paste(unlist(geneList),collapse='-')),sep='-')[1])
+    }
+  }
+}
+
+#Save here
+saveRDS(octo.data, file = "D:/cellranger/octoData_shortNames2.rds")
+
+#==============================================================
+
+#Read in if exited RStudio after running above code
+#octo.data <- readRDS(file = "C:/Users/User/Documents/MillerLab/cellranger/octoData2.rds")
+
+# Initialize the Seurat object with the raw (non-normalized data).
+octo <- CreateSeuratObject(counts = octo.data, project = "Hisat3_octo", min.cells = 3, min.features = 200)
+octo
+
+#Quality Control steps
+#NOTE: Octo data has a very low percentage of mitochondrial genes because of the poor annotations.
+#We decided to not filter these out because it doesn't seem meaningful right now.
+mito.genes <- grep(pattern = "mitochondria", x = rownames(x = octo), value = TRUE)
+percent.mito <- Matrix::colSums(octo) / Matrix::colSums(octo)
+octo[["percent.mt"]] <- PercentageFeatureSet(octo, pattern = "mitochondria")
+
+#try this without subsetting to nFeature_RNA to 2500
+#Have been using 500 as lower bound--right now use UMAP clusters to decide on these parameters
+#octo <- subset(octo, subset = nFeature_RNA > 500 & nFeature_RNA < 4000 & percent.mt < 5)
+octo <- subset(octo, subset = nFeature_RNA > 500 & nFeature_RNA < 4000 & nCount_RNA<10000)
+
+plot1 <- FeatureScatter(octo, feature1 = "nCount_RNA", feature2 = "percent.mt")
+plot2 <- FeatureScatter(octo, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+CombinePlots(plots = list(plot1, plot2))
+plot2
+
+#View first five of the meta data
+head(octo@meta.data, 20)
+
+VlnPlot(octo, features = c("nFeature_RNA", "nCount_RNA"), ncol = 3)
+
+#=========================================
+
+#TODO - add if/else and option to use scTransform instead
+
+octoN <- NormalizeData(octo, normalization.method = "LogNormalize", scale.factor = 10000)
+octoN <- FindVariableFeatures(octoN, selection.method = "vst", nfeatures = 2000)
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(octoN), 10)
+
+# plot variable features with and without labels
+plot3 <- VariableFeaturePlot(octoN, pt.size=2)
+plot4 <- as_label(plot = plot1, points = top10, repel = TRUE)
+CombinePlots(plots = list(plot3, plot4))
+plot3
+
+octo.genes <- rownames(octoN)
+octoN <- ScaleData(octoN, features = octo.genes)
+
+# TODO -  end for loop over datasets
+#==============
+
+#TODO - this would be the place to put in merge (either standard or CCA)
+
+#Optional save
+#saveRDS(octoN, file = "D:/cellranger/octoN_onlyHisatNames.rds")
+#octoN <- readRDS(file = "D:/cellranger/octoN_onlyHisatNames.rds")
+
+#Change name of the object here so that we can easily come back
+#standard is 20pcs (what I ran here), might want to try 200-300 (Mea uses 200) npcs=200
+
+#TODO - replace hardcoded PCAs with parameter in next few lines
+
+octo.norm <- RunPCA(octoN, features = VariableFeatures(object = octoN),npcs = 20)
+#saveRDS(octo.norm, file = "D:/cellranger/octo.norm_shortNames.rds")
+octo.norm <- readRDS(file = "D:/cellranger/octo.norm.rds")
+
+# Examine and visualize PCA results a few different ways
+print(octo.norm[["pca"]], dims = 1:5, nfeatures = 5)
+
+VizDimLoadings(octo.norm, dims = 1:2, reduction = "pca")
+
+ElbowPlot(octo.norm)
+DimPlot(octo.norm, reduction = "pca", pt.size=2)
+
+DimPlot(octo.norm, reduction = "pca", dims=c(19,20),pt.size=2)
+
+DimHeatmap(octo.norm, dims = 1, cells = 500, balanced = TRUE)
+DimHeatmap(octo.norm, dims = 1:10, cells = 500, balanced = TRUE)
+
+#Jackstraw gives errror--can't find any solutions on google so skipping for now
+#octo.norm <- JackStraw(octo.norm, num.replicate = 100)
+#octo.norm <- ScoreJackStraw(octo.norm, dims = 1:20)
+#JackStrawPlot(all.norm, dims = 1:20)
+
+#Resolution changes the stringency of the clustering. A higher resolution will pull apart the clusters
+octo.norm <- FindNeighbors(octo.norm, dims = 1:20)
+octo.norm <- FindClusters(octo.norm, reduction.type = "pca", dims = 1:20, resolution = 1)
+
+head(Idents(octo.norm), 5)
+
+octo.norm <- RunUMAP(octo.norm, dims = 1:20)
+DimPlot(octo.norm, reduction = "umap", pt.size=1)
+
+
+#===========================================================
+
+#Build phylogenetic tree 
+octo.normTREE <- BuildClusterTree(octo.norm, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims=1:20)
+pdf("clusterTree.pdf", height = 4.5, width = 7)
+PlotClusterTree(octo.normTREE)
+dev.off()
+
+octo.normTREE <- RunUMAP(octo.normTREE, dims = 1:20)
+pdf("hierarchicalTree.pdf", height = 7, width = 10)
+DimPlot(octo.normTREE, reduction = "umap", label = TRUE, pt.size = 1)
+dev.off()
+
+cluster1.markers <- FindMarkers(octo.norm, ident.1 = 1, min.pct = 0.25)
+head(cluster1.markers, n =5)
+
+cluster1.markersROC <- FindMarkers(octo.normTREE, ident.1 = 1, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
+head(cluster1.markersROC, n =2)
+VlnPlot(octo.normTREE, features = c("Ocbimv22020074m-Ocbimv22020075m-Ocbimv22020073m-Ocbimv22020076m-Ocbimv22020071m-OCTOGene.28758--"))
+
+cluster2.markersROC <- FindMarkers(octo.normTREE, ident.1 = 2, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
+head(cluster2.markersROC, n =5)
+write.table(cluster2.markersROC, "C:/Users/User/Documents/MillerLab/cellranger/cluster2Markers.csv", sep=",")
+
+#Find markers for every cluster against every other cell. Only positive ones are reported
+octo.markers <- FindAllMarkers(octo.normTREE, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+
+cluster30_33.markers <- FindMarkers(octo.normTREE, ident.1 = c(30,31,32,33), ident.2 = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,
+                                                                                 15,16,17,18,19,20,21,22,23,24,25,26,27,28,29), min.pct = 0.25)
+head(cluster30_33.markers, n = 10)
+
+top2 <- octo.markers %>% group_by(cluster) %>% top_n(n = 2, wt = avg_logFC)
+write.table(top2, "C:/Users/User/Documents/MillerLab/cellranger/top2_onlyHisatNames.csv", sep=",", quote=FALSE)
+
+#saveRDS(octo.markers, file = "D:/cellranger/octo.markers_onlyHisatNames.rds")
+octo.markers <- readRDS(file = "D:/cellranger/octo.markers_onlyHisatNames.rds")
+
+#=====================================================================================
+
+#Changed working directory because I saved these files in a different location
+setwd("C:/Users/User/Documents/MillerLab/cellranger")
+#NeuroGenes from Judit
+neuroGenes <- read.table("NeuroGenes.csv",header = TRUE, sep = ",")
+#DevoGenes from Judit
+DevoGenes <- read.table("DevoGenes.csv", header=TRUE, sep = ",")
+
+#Add extra column (change based on which csv you are using)
+DevoGenes$fullName=""
+
+#This loop searches for the full names of the DevoGenes within the octo.norm object
+#and then pastes them into the new "fullname" column
+for (row in 1:nrow(DevoGenes)){
+  p = DevoGenes[row,"ID"]
+  #print(p)
+  newName = grep(pattern = p, x = rownames(x = octo.norm), value = TRUE)
+  if (identical(newName,character(0))){
+    DevoGenes$fullName[row] = "none"
+  }
+  else if (length(newName) != 1){
+    l = length(newName)
+    DevoGenes$fullName[row] = newName[l]
+  }
+  else{
+    DevoGenes$fullName[row] = newName
+  }
+}
+
+#This removes any of the Devo/Neuro genes that were not found in the octo.norm object
+#These are not found because hisat did not "pick up" all of the ocbimv names
+#For those, I found them in IGV and manually created the figures outside of the loop
+DevoGenesN = data.frame()
+for (row in 1:nrow(DevoGenesN)){
+  if (DevoGenes$fullName[row] != "none"){
+    DevoGenesN <- rbind(DevoGenesN, DevoGenes[row,])
+  }
+}
+
+#Remove any spaces in the names
+DevoGenesN$Gene <- lapply(DevoGenesN$Gene, gsub, pattern=' ', replacement='-')
+#Remove any / in the names
+#neuroGenesN <- lapply(neuroGenesN, gsub, pattern='/', replacement='-')
+
+#=========================================================
+
+setwd("C:/Users/User/Documents/MillerLab/cellranger")
+
+#This loop runs each row in DevoGenesN and prints out a png file for each type of graph
+#Make sure to set the working directory to a place that you want all these figures to be saved!
+for (row in 1:nrow(DevoGenesN)){
+
+  name = DevoGenesN$fullName[row]
+  name2 = DevoGenesN$fullName[row]
+  name2 <- lapply(name2, gsub, pattern='/', replacement='-')
+  name2 <- lapply(name2, gsub, pattern='\\?', replacement='-')
+  name2 <- lapply(name2, gsub, pattern=' ', replacement='-')
+  name2 <- lapply(name2, gsub, pattern='\\"', replacement='-')
+  name2 <- substr(name2,1,60)
+  gene = DevoGenesN$Gene[row]
+  
+  vlnplotName = paste(gene, name2, "vlnplot.png", sep = "_")
+  png(vlnplotName, width = 900, height = 700)
+  vln <- VlnPlot(octo.normTREE, features = name)
+  print(vln)
+  dev.off()
+
+  dotplotName = paste(gene, name2,'dotplot.png', sep = '_')
+  png(dotplotName, width = 900, height = 700)
+  dp <- DotPlot(octo.normTREE, features = name)
+  print(dp)
+  dev.off()
+  
+  featureplotName = paste(gene, name2,'featureplot.png', sep = '_')
+  png(featureplotName, width = 900, height = 700)
+  fp <- FeaturePlot(octo.normTREE, features = name, sort.cell = TRUE, pt.size = 1.5)
+  print(fp)
+  dev.off()
+}
