@@ -1,0 +1,169 @@
+---
+title: "CCAintegration"
+author: "jos"
+date: "4/2/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+### Begin code (source: https://satijalab.org/seurat/Seurat_AlignmentTutorial.html)
+Aligning two different datasets- read in two count matrices and set up Seurat objects
+```{r}
+library(Seurat)
+library(cowplot) # cowplot enables side-be-side ggplots
+
+# load data 
+seqwell.data <- read.table(file = paste0("~/Downloads/IntegratedAnalysis_ExpressionMatrices/", 
+    "pbmc_SeqWell.expressionMatrix.txt"))
+tenx.data <- read.table(file = paste0("~/Downloads/IntegratedAnalysis_ExpressionMatrices/", 
+    "pbmc_10X.expressionMatrix.txt"))
+
+# since count matrices have been filtered (parameters were set beforehand), no additional filtering is necessary before/when creating Seurat Objects
+# Note: want to use variable genes in each of the datasets to align biologically relevant signal
+
+seqwell <- CreateSeuratObject(raw.data = seqwell.data)
+seqwell <- NormalizeData(object = seqwell)
+seqwell <- ScaleData(object = seqwell)
+seqwell <- FindVariableGenes(object = seqwell, do.plot = FALSE)
+
+tenx <- CreateSeuratObject(raw.data = tenx.data)
+tenx <- NormalizeData(object = tenx)
+tenx <- ScaleData(object = tenx)
+tenx <- FindVariableGenes(object = tenx, do.plot = FALSE)
+
+# Take union of top 2k variable genes in each dataset for alignment
+hvg.seqwell <- rownames(x = head(x = seqwell@hvg.info, n = 2000))
+hvg.tenx <- rownames(x = head(x = tenx@hvg.info, n = 2000))
+hvg.union <- union(x = hvg.seqwell, y = hvg.tenx)
+
+# Set 'protocol' in each dataset for easy identification; later will be transferred to the merged object in RunCCA
+tenx@meta.data[, "protocol"] <- "10X"
+seqwell@meta.data[, "protocol"] <- "SeqWell"
+```
+
+## Begin running canonical correlation analysis to identify common sources of variation between the two datasets. RunCCA will also combine the two obects into a single object and sotres the canonical correlation vectors (vectors that project each dataset into the maximally correlated subspaces). We can also store the original dataset identity as a column in "object@meta.data"
+```{r}
+pbmc <- RunCCA(object = tenx, object2 = seqwell, genes.use = hvg.union)
+
+# Visualize results of CCA plot CC1 versus CC2 and look at a violin plot
+p1 <- DimPlot(object = pbmc, reduction.use = "cca", group.by = "protocol", pt.size = 0.5, 
+    do.return = TRUE)
+p2 <- VlnPlot(object = pbmc, features.plot = "CC1", group.by = "protocol", do.return = TRUE)
+plot_grid(p1, p2) # this might be plot1 + plot2/ p1 + p2
+
+PrintDim(object = pbmc, reduction.type = "cca", dims.print = 1:2, genes.print = 10)
+```
+
+## Next, we'll need to choose CCs for downstream analysis for "aligning" the datasets. Before this, we search for cells whose expression level cannot be well-explained by low-dimensional CCA, compared to low-dimensional PCA. 
+Note: "The problem of choosing CCs for downstream analysis is similar to choosing PCs for clustering. We are developing resampling based procedures for this, but here explore the CC dimensions as we have previously demonstrated for PCA. We begin to see drop-off in signal after CC13, so we chose CC1-13 for analysis. You can try modifying this parameter (i.e. 1-15 or even 1-20) without significant changes in the results"
+```{r}
+DimHeatmap(object = pbmc, reduction.type = "cca", cells.use = 500, dim.use = 1:9, 
+    do.balanced = TRUE)
+DimHeatmap(object = pbmc, reduction.type = "cca", cells.use = 500, dim.use = 10:18, 
+    do.balanced = TRUE)
+
+# Determine which cells have expression profiles that cannot be well-explained by low-dimensional CCA, compared to low-dimensional PCA.
+pbmc <- CalcVarExpRatio(object = pbmc, reduction.type = "pca", grouping.var = "protocol", 
+    dims.use = 1:13)
+  
+# discard cells where cvariance explained by CCA is <2-fold (ration < 0.5) compared to PCA
+pbmc.all.save <- pbmc
+pbmc <- SubsetData(object = pbmc, subset.name = "var.ratio.pca", accept.low = 0.5)
+
+# You can visualize the discarded cells, which tend ot have lower gene counts or can represent cells that are dataset-specific
+pbmc.discard <- SubsetData(object = pbmc.all.save, subset.name = "var.ratio.pca", 
+    accept.high = 0.5)
+median(x = pbmc@meta.data[, "nGene"])
+median(x = pbmc.discard@meta.data[, "nGene"])
+VlnPlot(object = pbmc.discard, features.plot = "PF4", group.by = "protocol")
+```
+
+## Begin aligning CCA subspaces, which will return a new dimensional reduction called cca.aligned
+```{r}
+pbmc <- AlignSubspace(object = pbmc, reduction.type = "cca", grouping.var = "protocol", 
+    dims.align = 1:13)
+
+# Visualize the CCA and performed integrated analysis
+p1 <- VlnPlot(object = pbmc, features.plot = "ACC1", group.by = "protocol", 
+    do.return = TRUE)
+p2 <- VlnPlot(object = pbmc, features.plot = "ACC2", group.by = "protocol", 
+    do.return = TRUE)
+plot_grid(p1, p2)
+```
+
+## Able to run single integrated analysis on all cells
+```{r}
+pbmc <- RunTSNE(object = pbmc, reduction.use = "cca.aligned", dims.use = 1:13, 
+    do.fast = TRUE)
+pbmc <- FindClusters(object = pbmc, reduction.type = "cca.aligned", dims.use = 1:13, 
+    save.SNN = TRUE)
+p1 <- TSNEPlot(object = pbmc, group.by = "protocol", do.return = TRUE, pt.size = 0.5)
+p2 <- TSNEPlot(object = pbmc, do.return = TRUE, pt.size = 0.5)
+plot_grid(p1, p2)
+```
+
+## Plotting features and renaming clusters
+```{r}
+FeaturePlot(object = pbmc, features.plot = c("CD3D", "SELL", "S100A4", "CD8A", 
+    "GNLY", "MS4A1", "FCGR3A", "HSP90AB1", "CCR7"), min.cutoff = "q9", cols.use = c("lightgrey", 
+    "blue"), pt.size = 0.5)
+
+new.ident <- c("CD14 Mono", "Memory CD4 T", "Naive CD4 T", "CD8 T", "NK", "B", 
+    "CD16 Mono", "HS_Stress", "DC")
+for (i in 0:8) {
+    pbmc <- RenameIdent(object = pbmc, old.ident.name = i, new.ident.name = new.ident[i + 
+        1])
+}
+```
+
+## Example: finding markers of memory vs naive cells in both datasets
+```{r}
+mem_vs_naive <- FindConservedMarkers(object = pbmc, ident.1 = "Memory CD4 T", 
+    ident.2 = "Naive CD4 T", grouping.var = "protocol")
+head(x = mem_vs_naive, n = 10) # Impt: FindConservedMarkers
+```
+
+## Able to visualize proportional shifts in the data using a barplot
+```{r}
+freq_table <- prop.table(x = table(pbmc@ident, pbmc@meta.data[, "protocol"]), 
+    margin = 2)
+barplot(height = freq_table)
+
+freq_table
+```
+
+## To confirm that the alginment makes sense, can use other plotting functions
+```{r}
+FeatureHeatmap(object = pbmc, features.plot = c("CD3D", "FCGR3A", "MS4A1"), 
+    group.by = "protocol", sep.scale = TRUE, pt.size = 0.5, cols.use = c("lightgrey", 
+        "blue"))
+```
+
+## Save file at the end of the session
+```{r}
+saveRDS(pbmc, file = "~/Projects/datasets/pbmc_alignment.rds")
+```
+
