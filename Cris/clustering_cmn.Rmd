@@ -32,7 +32,7 @@ all <- Read10X(data.dir = "D:/data/octo seq/Cellranger/OctoSeq2.1/raw_feature_bc
 # takes a few minutes
 
 ```{r}
-ref <- read.csv("D:/data/octo seq/refMaster.csv",stringsAsFactors=FALSE)
+ref <- read.csv("D:/data/octo seq/refMaster_040420.csv",stringsAsFactors=FALSE)
 
 ngenes <- length(all@Dimnames[[1]])
 for (g in 1:ngenes){
@@ -437,10 +437,37 @@ DotPlot(all.normTREE,features=rev(all.genes[genelist])) + RotatedAxis()
 #heatmap of yfg (your favorite gene)
 
 yfg <- read.csv("D:/data/octo seq/GeneIDs - More Neuro.csv",stringsAsFactors=FALSE)
+yfg.unique = unique(yfg[,2])
+genelist <- vector()
+nomatch <- list()
+for (i in 1:length(yfg.unique)){
+  gene <- yfg.unique[i]
+#gene<-substr(gene,1,str_length(gene)-1)
+  loc <- grep(gene,all.genes)
+  if (length(loc)>0) {
+    genelist <- c(genelist,loc)
+  } else {
+    nomatch <- c(nomatch,yfg[[i,2]])
+  }
+}
+DotPlot(all.normTREE,features=rev(all.genes[genelist[1:100]])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+
+DotPlot(all.normTREE,features=rev(all.genes[genelist[101:200]])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+
+DotPlot(all.normTREE,features=rev(all.genes[genelist[201:270]])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+
+
+
+```
+```{r}
+
+#heatmap of gpcrs
+
+yfg <- read.csv("D:/data/octo seq/GeneIDs - All GPCRs.csv",stringsAsFactors=FALSE)
 
 genelist <- vector()
 nomatch <- list()
-for (i in 1:205){
+for (i in 1:327){
   gene <- yfg[[i,2]]
 #gene<-substr(gene,1,str_length(gene)-1)
   loc <- grep(gene,all.genes)
@@ -450,10 +477,7 @@ for (i in 1:205){
     nomatch <- c(nomatch,yfg[[i,2]])
   }
 }
-DotPlot(all.normTREE,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 4))
-
-
-
+DotPlot(all.normTREE,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
 ```
 
 
