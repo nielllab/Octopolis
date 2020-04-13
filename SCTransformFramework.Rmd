@@ -1,0 +1,114 @@
+---
+title: "scTransformFramework"
+author: "jos"
+date: "4/2/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+### Code Summary (Source: https://satijalab.org/seurat/v3.0/integration.html)
+1. create list of Seurat objects to integrate
+2. perform SCTransform normalization separately for each dataset
+3. run the PrepSCTIntregration function on the object list
+4. Integrate datasets, and proceed with joint analysis
+
+## Load in libraries and data
+```{r}
+library(Seurat)
+library(ggplot2)
+options(future.globals.maxSize = 4000 * 1024^2)
+pancreas.data <- readRDS(file = "../data/pancreas_expression_matrix.rds")
+metadata <- readRDS(file = "../data/pancreas_metadata.rds")
+pancreas <- CreateSeuratObject(pancreas.data, meta.data = metadata)
+pancreas.list <- SplitObject(pancreas, split.by = "tech")
+
+for (i in 1:length(pancreas.list)) {
+    pancreas.list[[i]] <- SCTransform(pancreas.list[[i]], verbose = FALSE)
+}
+```
+
+## Select features for downstream integration, and run PrepSCTIntegration so that all necessary Pearson residuals have been calculated
+```{r}
+pancreas.features <- SelectIntegrationFeatures(object.list = pancreas.list, nfeatures = 3000)
+pancreas.list <- PrepSCTIntegration(object.list = pancreas.list, anchor.features = pancreas.features, 
+    verbose = FALSE)
+```
+
+## Identify anchors and integrate datasets. Use the standard workflow, with the exception that normalization.method = 'SCT'
+```{r}
+pancreas.anchors <- FindIntegrationAnchors(object.list = pancreas.list, normalization.method = "SCT", 
+    anchor.features = pancreas.features, verbose = FALSE)
+pancreas.integrated <- IntegrateData(anchorset = pancreas.anchors, normalization.method = "SCT", 
+    verbose = FALSE)
+```
+
+## Next, we'll want to proceed with standard downstream analysis (i.e. visualization, clustering) except we will not run the ScaleData function. 
+Note: You can see that after integration, cells group by their biological cell type (which has been pre-annotated), instead of by their underlying technology.
+```{r}
+pancreas.integrated <- RunPCA(pancreas.integrated, verbose = FALSE)
+pancreas.integrated <- RunUMAP(pancreas.integrated, dims = 1:30)
+plots <- DimPlot(pancreas.integrated, group.by = c("tech", "celltype"), combine = FALSE)
+plots <- lapply(X = plots, FUN = function(x) x + theme(legend.position = "top") + guides(color = guide_legend(nrow = 3, 
+    byrow = TRUE, override.aes = list(size = 3))))
+CombinePlots(plots)
+```
+
+## Example: apply workflow to a series of human PBMC datasets from eight different technologies
+```{r}
+pbmc.data <- readRDS("../data/pbmc_ssc_mat.rds")
+pbmc.metadata <- readRDS("../data/pbmc_ssc_metadata.rds")
+pbmc <- CreateSeuratObject(counts = pbmc.data, meta.data = pbmc.metadata)
+
+pbmc <- subset(pbmc, subset = nFeature_RNA > 200)
+pbmc.list <- SplitObject(pbmc, split.by = "Method")
+for (i in names(pbmc.list)) {
+    pbmc.list[[i]] <- SCTransform(pbmc.list[[i]], verbose = FALSE)
+}
+pbmc.features <- SelectIntegrationFeatures(object.list = pbmc.list, nfeatures = 3000)
+pbmc.list <- PrepSCTIntegration(object.list = pbmc.list, anchor.features = pbmc.features)
+pbmc.anchors <- FindIntegrationAnchors(object.list = pbmc.list, normalization.method = "SCT", 
+    anchor.features = pbmc.features)
+pbmc.integrated <- IntegrateData(anchorset = pbmc.anchors, normalization.method = "SCT")
+
+pbmc.integrated <- RunPCA(object = pbmc.integrated, verbose = FALSE)
+pbmc.integrated <- RunUMAP(object = pbmc.integrated, dims = 1:30)
+
+plots <- DimPlot(pbmc.integrated, group.by = c("Method", "CellType"), combine = FALSE)
+plots <- lapply(X = plots, FUN = function(x) x + theme(legend.position = "top") + guides(color = guide_legend(nrow = 3, 
+    byrow = TRUE, override.aes = list(size = 3))))
+CombinePlots(plots)
+
+# Cells are grouped together by shared biological subtype instead of technology
+DimPlot(pbmc.integrated, group.by = "CellType", split.by = "Method", ncol = 3)
+
+# Integrated analysis is able to reveal finer subdivisions among broad cell types since the combined dataset has substantially greater statistical power. Note: you can add "split.by = 'Method'" to make these plots for each technology independently.
+DefaultAssay(pbmc.integrated) <- "RNA"
+
+# Normalize RNA data for visualization purposes
+pbmc.integrated <- NormalizeData(pbmc.integrated, verbose = FALSE)
+FeaturePlot(pbmc.integrated, c("CCR7", "S100A4", "GZMB", "GZMK", "GZMH", "TCL1A"))
+```
+

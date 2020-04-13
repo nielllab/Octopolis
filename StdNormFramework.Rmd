@@ -1,0 +1,378 @@
+se---
+title: "StdNormFramework"
+author: "jos"
+date: "4/3/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+### Begin Code
+
+## Load libraries
+```{r}
+library(Seurat) 
+library(Matrix)
+library(ggplot2)
+library(sctransform)
+library(stringr)
+```
+
+## Standard pre-processing and normalization ~15m
+```{r}
+ all <- Read10X(data.dir = "/Users/josongco/Talapas/Cellranger/OctoSeq2.1/raw_feature_bc_matrix")
+    
+    ref <- read.csv("/Users/josongco/Desktop/SeqData/miniNCBI_annotations_alltomitochondria_022420.csv", stringsAsFactors = FALSE)
+      ngenes <- length(all@Dimnames[[1]])
+      for (g in 1:ngenes){
+        gene <- all@Dimnames[[1]][g]
+        gene <- substr(gene, 6, str_length(gene)-2)
+        ind<- grep(gene, ref[[1]])
+        if (length(ind)>0) {
+          id <- ref[[ind[1], 2]]
+          if (str_length(id)>0){
+            id <- str_remove_all(id, "\\(") # parentheses mess up gene names as dimensions
+            id <- str_remove_all(id, "\\)") 
+            id <- substr(id, 1, 60) # keep it short
+            all@Dimnames[[1]][g] <- paste(id, gene, sep= '-')
+        }
+      }
+  }
+
+all <- CreateSeuratObject(counts = all, project = "OctoSeqStdN", min.cells = 3, min.features = 200)
+all
+
+#all[["percent.mt"]] <- PercentageFeatureSet(all, pattern = "^mitochondria-") # Seurat uses this function to extract information re: mitochondrial genes
+
+mito.genes <- grep(pattern = "^mitochondria-", x = rownames(x = all), value = TRUE)
+percent.mito <- Matrix::colSums(all) / Matrix::colSums(all)
+all[["percent.mt"]] <- PercentageFeatureSet(all, pattern = "^mitochondria-")
+
+VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3) # visualize the relationship between three variables: nFeature (genes) nCount (UMI counts) and percent.mt (mitochondrial genes)
+
+plot1 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "percent.mt") # visualize the relationship between UMI counts and mitochondrial genes (percent)
+plot2 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") # visualize the relationship between genes (ID as > 1 UMI count) and mitochondrial genes (percent)
+plot1 + plot2
+
+all <- subset(all, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5) # set parameters to include cells with the following critera: > 200, < 2500, less than 5% mitochondrial genes, since a higher number of mitochondrial genes is indicative of stress 
+
+## Begin normalizing the data: Apply global scaling after removing unwanted cells from the dataset
+all <- NormalizeData(all) # applies a Log Normalize by scale factor of 10,000 as default
+
+## ID highly variable features (feature selection) 
+# To calculate a subset of features that exhibit high cell-to-cell variation in the dataset (i.e. genes that are highly expressed in some cells and lowly expressed in others), the following function returns 2,000 features per data set, which will be used in downstream analyses like PCA
+all <- FindVariableFeatures(all, selection.method = "vst", nfeatures = 2000)
+top10 <- head(VariableFeatures(all), 10) # ID 10 most highly variable genes
+plot1 <- VariableFeaturePlot(all)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+
+## Scale the data: this is a standard pre-processing step required for dimensional reduction techniques
+# Applies a linear transformation: 1) shifts the expression of each gene so that the mean expression across cells is 0, 2) scales the expression of each gene so that the variance across cells is 1, allowing for downstream analyses to utilize equal weight of each gene so that highly-expressed genes do not dominate; 3) results will be stored in all[["RNA]]@scale.data
+all.genes <- rownames(all)
+all <- ScaleData(all, vars.to.regress = "percent.mt") # regress out UMI counts and percent.mt which is helpful when integrating v2 and v3 chemistry; alt: all <- ScaleData(all, features = all.genes)
+```
+
+## Integrate datasets with standard normalization before continuing with PCA ~15m
+Source: https://satijalab.org/seurat/v3.0/merge_vignette.html
+Modified based on Integration paper (Source: https://www.cell.com/cell/pdf/S0092-8674(19)30559-8.pdf)
+*Note: paper suggests feature selection on each dataset individually, but did not incorporate this into present pipeline; paper also implies ScaleData performed before using FindVariableFeatures function
+```{r}
+all2.data <- Read10X("/Users/josongco/Talapas/Cellranger/OctoSeq2.1/raw_feature_bc_matrix")
+ref <- read.csv("/Users/josongco/Desktop/SeqData/miniNCBI_annotations_alltomitochondria_022420.csv", stringsAsFactors = FALSE)
+      ngenes <- length(all2.data@Dimnames[[1]])
+      for (g in 1:ngenes){
+        gene <- all2.data@Dimnames[[1]][g]
+        gene <- substr(gene, 6, str_length(gene)-2)
+        ind<- grep(gene, ref[[1]])
+        if (length(ind)>0) {
+          id <- ref[[ind[1], 2]]
+          if (str_length(id)>0){
+            id <- str_remove_all(id, "\\(") # parentheses mess up gene names as dimensions
+            id <- str_remove_all(id, "\\)") 
+            id <- substr(id, 1, 60) # keep it short
+            all2.data@Dimnames[[1]][g] <- paste(id, gene, sep= '-')
+        }
+      }
+  }
+
+all2 <- CreateSeuratObject(counts = all2.data, project = "Run2")
+all2
+all2[["percent.mt"]] <- PercentageFeatureSet(all2, pattern = "^mitochondria-")
+all2 <- subset(all2, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
+all2 <- NormalizeData(all2)
+all2 <- FindVariableFeatures(all2, selection.method = "vst", nfeatures = 2000)
+top10 <- head(VariableFeatures(all2), 10)
+all2.genes <- rownames(all2) # use this function if you want to scale based on variable features
+#all2 <- ScaleData(all2, vars.to.regress = "percent.mt") # this step takes a long time!
+all2 <- ScaleData(all2, features = all2.genes)
+
+all3.data <- Read10X("/Users/josongco/Talapas/Cellranger/OctoSeq2.2/raw_feature_bc_matrix")
+ref <- read.csv("/Users/josongco/Desktop/SeqData/miniNCBI_annotations_alltomitochondria_022420.csv", stringsAsFactors = FALSE)
+      ngenes <- length(all3.data@Dimnames[[1]])
+      for (g in 1:ngenes){
+        gene <- all3.data@Dimnames[[1]][g]
+        gene <- substr(gene, 6, str_length(gene)-2)
+        ind<- grep(gene, ref[[1]])
+        if (length(ind)>0) {
+          id <- ref[[ind[1], 2]]
+          if (str_length(id)>0){
+            id <- str_remove_all(id, "\\(") # parentheses mess up gene names as dimensions
+            id <- str_remove_all(id, "\\)") 
+            id <- substr(id, 1, 60) # keep it short
+            all3.data@Dimnames[[1]][g] <- paste(id, gene, sep= '-')
+        }
+      }
+  }
+
+all3 <- CreateSeuratObject(counts = all3.data, project = "Run3")
+all3
+all3[["percent.mt"]] <- PercentageFeatureSet(all3, pattern = "^mitochondria-")
+all3 <- subset(all3, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
+all3 <- NormalizeData(all3)
+all3 <- FindVariableFeatures(all3, selection.method = "vst", nfeatures = 2000)
+top10 <- head(VariableFeatures(all3), 10)
+all3.genes <- rownames(all3) # use this function if you want to scale based on variable features
+#all2 <- ScaleData(all3, vars.to.regress = "percent.mt") # this step takes a long time!
+all3 <- ScaleData(all3, features = all3.genes)
+
+saveRDS(all2, file = "all2norm.RDS")
+saveRDS(all3, file = "all3norm.RDS")
+```
+
+## Merge normalized datasets ~2m
+```{r}
+# Load data
+all2 <- readRDS("all2norm.RDS")
+all3 <- readRDS("all3norm.RDS")
+allnorm <- merge(all2, y = all3, add.cell.ids = c("Run2", "Run3"), project = "V3Chem", merge.data = TRUE)
+GetAssayData(allnorm)
+```
+
+## Merge raw datasets since integration vignette does not merge commands from individual datasets (meaning you'll need to rerun all of the standard data preprocessing on the merged object)
+```{r}
+all2.data <- Read10X("/Users/josongco/Talapas/Cellranger/OctoSeq2.1/raw_feature_bc_matrix")
+ref <- read.csv("/Users/josongco/Desktop/SeqData/miniNCBI_annotations_alltomitochondria_022420.csv", stringsAsFactors = FALSE)
+      ngenes <- length(all2.data@Dimnames[[1]])
+      for (g in 1:ngenes){
+        gene <- all2.data@Dimnames[[1]][g]
+        gene <- substr(gene, 6, str_length(gene)-2)
+        ind<- grep(gene, ref[[1]])
+        if (length(ind)>0) {
+          id <- ref[[ind[1], 2]]
+          if (str_length(id)>0){
+            id <- str_remove_all(id, "\\(") # parentheses mess up gene names as dimensions
+            id <- str_remove_all(id, "\\)") 
+            id <- substr(id, 1, 60) # keep it short
+            all2.data@Dimnames[[1]][g] <- paste(id, gene, sep= '-')
+        }
+      }
+  }
+
+all2 <- CreateSeuratObject(counts = all2.data, project = "Run2")
+all2
+all2[["percent.mt"]] <- PercentageFeatureSet(all2, pattern = "^mitochondria-")
+all2 <- subset(all2, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
+
+
+all3.data <- Read10X("/Users/josongco/Talapas/Cellranger/OctoSeq2.2/raw_feature_bc_matrix")
+ref <- read.csv("/Users/josongco/Desktop/SeqData/miniNCBI_annotations_alltomitochondria_022420.csv", stringsAsFactors = FALSE)
+      ngenes <- length(all3.data@Dimnames[[1]])
+      for (g in 1:ngenes){
+        gene <- all3.data@Dimnames[[1]][g]
+        gene <- substr(gene, 6, str_length(gene)-2)
+        ind<- grep(gene, ref[[1]])
+        if (length(ind)>0) {
+          id <- ref[[ind[1], 2]]
+          if (str_length(id)>0){
+            id <- str_remove_all(id, "\\(") # parentheses mess up gene names as dimensions
+            id <- str_remove_all(id, "\\)") 
+            id <- substr(id, 1, 60) # keep it short
+            all3.data@Dimnames[[1]][g] <- paste(id, gene, sep= '-')
+        }
+      }
+  }
+
+all3 <- CreateSeuratObject(counts = all3.data, project = "Run3")
+all3
+all3[["percent.mt"]] <- PercentageFeatureSet(all3, pattern = "^mitochondria-")
+all3 <- subset(all3, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
+
+all <- merge(all2, y = all3, add.cell.ids = c("Run2", "Run3"), project = "V3Chem")
+GetAssayData(all)
+```
+
+## Integrating data sets (source: https://satijalab.org/seurat/v3.1/integration.html)
+```{r}
+# To construct a refernce, we will identify "anchors" between the individual datasets. First we'll need to split the combined object into a list, with each dataset as an element
+all.list <- SplitObject(all, split.by = "orig.ident")
+#all.list <- all.list[c("Run2, Run3")] # keep getting error "no method or default for coercing 'NULL' to 'dgCMatrix' so decided to comment out
+
+# Seems like it is necessary to rerun normalization steps on merged object, but can still continue with data preprocessing on individual objects
+for (i in 1:length(all.list)) {
+    all.list[[i]] <- NormalizeData(all.list[[i]], verbose = FALSE)
+    all.list[[i]] <- FindVariableFeatures(all.list[[i]], selection.method = "vst", 
+        nfeatures = 2000, verbose = FALSE)
+}
+
+allnorm.list <- all.list
+reference.list <- allnorm.list[c("Run2", "Run3")]
+allnorm.anchors <- FindIntegrationAnchors(reference.list, dims = 1:30) # runs CCA ~25m
+allnorm.integrated <- IntegrateData(anchorset = allnorm.anchors, dims = 1:30)
+
+library(cowplot)
+library(patchwork)
+
+DefaultAssay(allnorm.integrated) <- "integrated"
+
+# Run the standard workflow for visualization and clustering
+allnorm.integrated <- ScaleData(allnorm.integrated, verbose = FALSE)
+allnorm.integrated <- RunPCA(allnorm.integrated, npcs = 30, verbose = FALSE)
+allnorm.integrated <- RunUMAP(allnorm.integrated, reduction = "pca", dims = 1:30)
+pdf("normPOSTmerge.pdf", height = 4.5, width = 7)
+DimPlot(allnorm.integrated, reduction = "umap", group.by = "orig.ident")
+#p2 <- DimPlot(allnorm.integrated, reduction = "umap", group.by = "celltype", label = TRUE, 
+    #repel = TRUE) + NoLegend()
+#p1 + p2
+dev.off()
+
+# Compare to original RNA assay without anchoring
+DefaultAssay(allnorm.integrated) <- "RNA"
+allnorm.integrated <- ScaleData(allnorm.integrated, verbose = FALSE)
+allnorm.integrated <- FindVariableFeatures(allnorm.integrated, selection.method = "vst", 
+        nfeatures = 2000, verbose = FALSE)
+allnorm.integrated <- RunPCA(allnorm.integrated, npcs = 30, verbose = FALSE)
+allnorm.integrated <- RunUMAP(allnorm.integrated, reduction = "pca", dims = 1:30)
+pdf("normPOSTmergeORIG.pdf", height = 4.5, width = 7)
+DimPlot(allnorm.integrated, reduction = "umap")
+#p2 <- DimPlot(allnorm.integrated, reduction = "umap", group.by = "celltype", label = TRUE, 
+    #repel = TRUE) + NoLegend()
+#p1 + p2
+dev.off()
+```
+
+## PCA and Clustering steps ~3m
+```{r}
+allnorm <- RunPCA(allnorm)
+allnorm <- FindNeighbors(allnorm, dims = 1:20)
+allnorm <- FindClusters(allnorm, reduction.type = "pca", dims = 1:20, resolution = 1)
+head(Idents(allnorm), 5)
+allnorm <- RunUMAP(allnorm, dims = 1:20)
+DimPlot(allnorm, reduction = "umap", label = TRUE, pt.size = 1)
+```
+
+## Building a dendogram to reflect hierarchical clustering ~2m
+```{r}
+allnorm.tree <- BuildClusterTree(allnorm, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = 1:20)
+pdf("clusterTree.pdf", height = 4.5, width = 7)
+PlotClusterTree(allnorm.tree)
+dev.off()
+
+allnorm.tree <- RunUMAP(allnorm.tree, dims = 1:20)
+pdf("hierarchicalTree.pdf", height = 7, width = 10)
+DimPlot(allnorm.tree, reduction = "umap", label = TRUE, pt.size = 1)
+dev.off()
+```
+
+##Plotting features ~2m
+```{r}
+#NeuroGenes from Judit
+neuroGenes <- read.table("NeuroGenes.csv",header = TRUE, sep = ",")
+#DevoGenes from Judit
+DevoGenes <- read.table("DevoGenes.csv", header=TRUE, sep = ",")
+
+#Add extra column (change based on which csv you are using)
+DevoGenes$fullName=""
+
+
+#This loop searches for the full names of the DevoGenes within the octo.norm object
+#and then pastes them into the new "fullname" column
+for (row in 1:nrow(DevoGenes)){
+ p = DevoGenes[row,"Gene.ID"]
+ #print(p)
+ newName = grep(pattern = "p", x = rownames(x = allnorm), value = TRUE)
+ if (identical(newName,character(0))){
+   DevoGenes$fullName[row] = "none"
+ }
+ else if (length(newName) != 1){
+   l = length(newName)
+   DevoGenes$fullName[row] = newName[l]
+ }
+ else{
+   DevoGenes$fullName[row] = newName
+ }
+}
+
+#This removes any of the Devo/Neuro genes that were not found in the allnorm object
+#These are not found because hisat did not "pick up" all of the ocbimv names
+#For those, I found them in IGV and manually created the figures outside of the loop
+DevoGenesN = data.frame(DevoGenes)
+for (row in 1:nrow(DevoGenesN)){
+ if (DevoGenes$fullName[row] != "none"){
+   DevoGenesN <- rbind(DevoGenesN, DevoGenes[row,])
+ }
+}
+
+#Remove any spaces in the names
+DevoGenesN$Gene <- lapply(DevoGenesN$Gene, gsub, pattern=' ', replacement='-')
+#Remove any / in the names
+#neuroGenesN <- lapply(neuroGenesN, gsub, pattern='/', replacement='-')
+
+#========================================================= For loop: plotting genes from csv file
+
+setwd("~/Desktop/SeqData/Genes/StdNv3") # set correct directory
+
+#This loop runs each row in DevoGenesN and prints out a png file for each type of graph
+#Make sure to set the working directory to a place that you want all these figures to be saved!
+for (row in 1:nrow(DevoGenesN)){
+
+ name = DevoGenesN$fullName[row]
+ name2 = DevoGenesN$fullName[row]
+ name2 <- lapply(name2, gsub, pattern='/', replacement='-')
+ name2 <- lapply(name2, gsub, pattern='\\?', replacement='-')
+ name2 <- lapply(name2, gsub, pattern=' ', replacement='-')
+ name2 <- lapply(name2, gsub, pattern='\\"', replacement='-')
+ name2 <- substr(name2,1,60)
+ gene = DevoGenesN$Gene[row]
+
+ vlnplotName = paste(gene, name2, "vlnplot.png", sep = "_")
+ png(vlnplotName, width = 900, height = 700)
+ vln <- VlnPlot(allnorm.tree, features = name)
+ print(vln)
+ dev.off()
+
+ dotplotName = paste(gene, name2,'dotplot.png', sep = '_')
+ png(dotplotName, width = 900, height = 700)
+ dp <- DotPlot(allnorm.tree, features = name)
+ print(dp)
+ dev.off()
+
+ featureplotName = paste(gene, name2,'featureplot.png', sep = '_')
+ png(featureplotName, width = 900, height = 700)
+ fp <- FeaturePlot(allnorm.tree, features = name, sort.cell = TRUE, pt.size = 1.5)
+ print(fp)
+ dev.off()
+}
+```
