@@ -171,7 +171,16 @@ allnorm <- merge(all2, y = all3, add.cell.ids = c("Run2", "Run3"), project = "V3
 GetAssayData(allnorm)
 ```
 
-## Merge raw datasets since integration vignette does not merge commands from individual datasets (meaning you'll need to rerun all of the standard data preprocessing on the merged object)
+
+# everything that was done above above gets over-written here. probably good to find a way to eliminate that redundancy. -cmn
+
+## Merge raw datasets since integration vignette does not merge commands from individual datasets (meaning you'll need to rerun all of the standard data preprocessing on the merged object) - cmn
+
+# would be very good to replace this with a for loop
+# for example, create a list of files to loop over
+# files = c("/Users/josongco/Talapas/Cellranger/OctoSeq2.1/raw_feature_bc_matrix", "/Users/josongco/Talapas/Cellranger/OctoSeq2.2/raw_feature_bc_matrix")
+# then create for loop such as for (d in 1:2)
+# and replace all2 and all3 with all[d] - cmn
 ```{r}
 all2.data <- Read10X("/Users/josongco/Talapas/Cellranger/OctoSeq2.1/raw_feature_bc_matrix")
 ref <- read.csv("/Users/josongco/Desktop/SeqData/miniNCBI_annotations_alltomitochondria_022420.csv", stringsAsFactors = FALSE)
@@ -230,6 +239,8 @@ GetAssayData(all)
 all.list <- SplitObject(all, split.by = "orig.ident")
 #all.list <- all.list[c("Run2, Run3")] # keep getting error "no method or default for coercing 'NULL' to 'dgCMatrix' so decided to comment out
 
+#normalization was done on allnorm, not on data in all, so explains why normalization is being done here. But I think this way here is correct based on vignette- cmn
+
 # Seems like it is necessary to rerun normalization steps on merged object, but can still continue with data preprocessing on individual objects
 for (i in 1:length(all.list)) {
     all.list[[i]] <- NormalizeData(all.list[[i]], verbose = FALSE)
@@ -258,6 +269,8 @@ DimPlot(allnorm.integrated, reduction = "umap", group.by = "orig.ident")
 #p1 + p2
 dev.off()
 
+# I don't think nomalization has been applied here. it was applied to all.list, but not clear if that carries over to the RNA data in the integration step. Esp since FindVariableFeatures didn't carry over. Also, I think FVF should come before ScaleData - cmn
+
 # Compare to original RNA assay without anchoring
 DefaultAssay(allnorm.integrated) <- "RNA"
 allnorm.integrated <- ScaleData(allnorm.integrated, verbose = FALSE)
@@ -273,6 +286,8 @@ DimPlot(allnorm.integrated, reduction = "umap")
 dev.off()
 ```
 
+## number of PCA dims changes here (from 30 to 20) 
+## probably safer to create a variable at top, e.g. nPCA, so it can be consistent - cmn
 ## PCA and Clustering steps ~3m
 ```{r}
 allnorm <- RunPCA(allnorm)
@@ -295,6 +310,30 @@ pdf("hierarchicalTree.pdf", height = 7, width = 10)
 DimPlot(allnorm.tree, reduction = "umap", label = TRUE, pt.size = 1)
 dev.off()
 ```
+
+## here is a quick way to plot the neurotransmitter genes (ones we're doing in situs on) - cmn
+```{r}
+yfg <- read.csv("D:/data/octo seq/Genes for in situ.csv",stringsAsFactors=FALSE)  # this file should be in gdrive
+
+genelist <- vector()
+nomatch <- list()
+for (i in 1:22){
+  gene <- yfg[[i,2]]
+  #gene<-substr(gene,7,str_length(gene)-1)
+  loc <- grep(gene,all.genes)
+  if (length(loc)>0) {
+    genelist <- c(genelist,loc)
+  } else {
+    nomatch <- c(nomatch,yfg[[i,2]])
+  }
+}
+
+DotPlot(all.normTREE,features=rev(all.genes[genelist])) + RotatedAxis()
+
+FeaturePlot(all.normTREE,features = all.genes[genelist[13:22]]) + NoLegend() + NoAxes()
+
+```
+
 
 ##Plotting features ~2m
 ```{r}

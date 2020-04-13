@@ -224,7 +224,12 @@ cluster.markers <- FindAllMarkers(all.normTREE, min.pct = 0.5, logfc.threshold =
 ```{r}
 top10 <- cluster.markers %>% group_by(cluster) %>% top_n(n = 5,wt = avg_logFC )
 #top10 <- cluster.markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
-DoHeatmap(all.normTREE, features = top10$gene) + NoLegend() + theme(axis.text.y = element_text(size = 5))
+#DoHeatmap(all.normTREE, features = top10$gene) + NoLegend() + theme(axis.text.y = element_text(size = 5))
+DotPlot(all.normTREE,features=rev(unique(top10[1:50,]$gene))) + RotatedAxis()+ theme(axis.text.x = element_text(size = 7))
+DotPlot(all.normTREE,features=rev(unique(top10[51:100,]$gene))) + RotatedAxis()+ theme(axis.text.x = element_text(size = 7))
+DotPlot(all.normTREE,features=rev(unique(top10[101:159,]$gene))) + RotatedAxis()+ theme(axis.text.x = element_text(size = 7))
+
+
 ```
 
 
@@ -347,14 +352,14 @@ print(these)
 
 #dotplot for one node individually
 ```{r}
-i<-10
+i<-14
   i
   these <- tree_markers[[i]]
   these <-these[which(abs(these$avg_logFC)>0),]
   these <- these[order(these$avg_logFC, decreasing = TRUE),]
   these <- rbind(head(these,10),tail(these,10))
 
-DotPlot(all.normTREE,features=rownames(these))
+DotPlot(all.normTREE,features=rownames(these))+ RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
   
 ```
 
@@ -477,7 +482,16 @@ for (i in 1:327){
     nomatch <- c(nomatch,yfg[[i,2]])
   }
 }
-DotPlot(all.normTREE,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+DotPlot(all.normTREE,features=rev(all.genes[genelist[1:50]])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+
+DotPlot(all.normTREE,features=rev(all.genes[genelist[51:100]])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+
+DotPlot(all.normTREE,features=rev(all.genes[genelist[101:150]])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+
+DotPlot(all.normTREE,features=rev(all.genes[genelist[151:200]])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+
+DotPlot(all.normTREE,features=rev(all.genes[genelist[201:243]])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+
 ```
 
 
@@ -500,9 +514,15 @@ DotPlot(all.normTREE,features=all.genes[grep("hox",all.genes,ignore.case=TRUE)])
 
 ```{r}
 cadh <-grep("cadherin",all.genes,ignore.case=TRUE)
-DotPlot(all.normTREE,features=all.genes[cadh[1:100]]) + RotatedAxis()+ theme(axis.text.x = element_text(size = 4))
 
-DotPlot(all.normTREE,features=all.genes[cadh[101:193]]) + RotatedAxis()+ theme(axis.text.x = element_text(size = 4))
+
+DotPlot(all.normTREE,features=all.genes[cadh[1:50]]) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+
+DotPlot(all.normTREE,features=all.genes[cadh[51:100]]) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+
+DotPlot(all.normTREE,features=all.genes[cadh[101:150]]) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+
+DotPlot(all.normTREE,features=all.genes[cadh[151:193]]) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
 
 ```
 
