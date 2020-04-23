@@ -1,7 +1,7 @@
 ---
 title: "scTransformFramework"
 author: "jos"
-date: "4/2/2020"
+date: "4/20/2020"
 output: html_document
 ---
 
@@ -35,42 +35,98 @@ Note that the `echo = FALSE` parameter was added to the code chunk to prevent pr
 3. run the PrepSCTIntregration function on the object list
 4. Integrate datasets, and proceed with joint analysis
 
-## Load in libraries and data
+## Load in libraries and data (Source: https://satijalab.org/seurat/v3.0/sctransform_vignette.html)
 ```{r}
 library(Seurat)
 library(ggplot2)
-options(future.globals.maxSize = 4000 * 1024^2)
-pancreas.data <- readRDS(file = "../data/pancreas_expression_matrix.rds")
-metadata <- readRDS(file = "../data/pancreas_metadata.rds")
-pancreas <- CreateSeuratObject(pancreas.data, meta.data = metadata)
-pancreas.list <- SplitObject(pancreas, split.by = "tech")
+library(stringr)
+```
+## Load data
+```{r}
+all2 <- Read10X(data.dir = "/Users/josongco/Talapas/Cellranger/OctoSeq2.1/raw_feature_bc_matrix")
+ref <- read.csv("/Users/josongco/Desktop/SeqData/miniNCBI_annotations_alltomitochondria_022420.csv", stringsAsFactors = FALSE)
+      ngenes <- length(all2@Dimnames[[1]])
+      for (g in 1:ngenes){
+        gene <- all2@Dimnames[[1]][g]
+        gene <- substr(gene, 6, str_length(gene)-2)
+        ind<- grep(gene, ref[[1]])
+        if (length(ind)>0) {
+          id <- ref[[ind[1], 2]]
+          if (str_length(id)>0){
+            id <- str_remove_all(id, "\\(") # parentheses mess up gene names as dimensions
+            id <- str_remove_all(id, "\\)") 
+            id <- substr(id, 1, 60) # keep it short
+            all2@Dimnames[[1]][g] <- paste(id, gene, sep= '-')
+        }
+      }
+      }
+all2 <- CreateSeuratObject(counts = all2, min.cells = 3, min.features = 200, project = "Run2") # removed (meta.data = metadata) & added (counts = all), min cells and min features, include project name
+all2[["percent.mt"]] <- PercentageFeatureSet(all2, pattern = "^mitochondria-") # Seurat uses this function to extract information re: mitochondrial genes
+all2 <- subset(all2, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
 
-for (i in 1:length(pancreas.list)) {
-    pancreas.list[[i]] <- SCTransform(pancreas.list[[i]], verbose = FALSE)
+
+
+all3 <- Read10X(data.dir = "/Users/josongco/Talapas/Cellranger/OctoSeq2.2/raw_feature_bc_matrix")
+ngenes <- length(all2@Dimnames[[1]])
+      for (g in 1:ngenes){
+        gene <- all2@Dimnames[[1]][g]
+        gene <- substr(gene, 6, str_length(gene)-2)
+        ind<- grep(gene, ref[[1]])
+        if (length(ind)>0) {
+          id <- ref[[ind[1], 2]]
+          if (str_length(id)>0){
+            id <- str_remove_all(id, "\\(") # parentheses mess up gene names as dimensions
+            id <- str_remove_all(id, "\\)") 
+            id <- substr(id, 1, 60) # keep it short
+            all2@Dimnames[[1]][g] <- paste(id, gene, sep= '-')
+        }
+      }
+      }
+all3 <- CreateSeuratObject(counts = all3, min.cells = 3, min.features = 200, project = "Run3")
+all3[["percent.mt"]] <- PercentageFeatureSet(all3, pattern = "^mitochondria-") 
+all3 <- subset(all3, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
+
+all <- merge(all2, all3, add.cell.ids = c("Run2", "Run3"), project = "V3Chem", merge.data = FALSE) # keeps raw counts
+
+# single dataset 
+#all <- SCTransform(all, vars.to.regress = "nCount_RNA", verbose = FALSE) # replaced "percent.mt" with "nCount_RNA" ~7m
+#all <- RunPCA(all, verbose = FALSE)
+#all <- RunUMAP(all, dims = 1:30, verbose = FALSE)
+#all <- FindNeighbors(all, dims = 1:30, verbose = FALSE)
+#all <- FindClusters(all, verbose = FALSE)
+#DimPlot(all, label = TRUE) + NoLegend()
+
+
+ #for an integrated data set: 
+all.list <- SplitObject(all, split.by = "orig.ident")
+
+for (i in 1:length(all.list)) {
+    all.list[[i]] <- SCTransform(all.list[[i]], verbose = FALSE)
 }
 ```
 
 ## Select features for downstream integration, and run PrepSCTIntegration so that all necessary Pearson residuals have been calculated
 ```{r}
-pancreas.features <- SelectIntegrationFeatures(object.list = pancreas.list, nfeatures = 3000)
-pancreas.list <- PrepSCTIntegration(object.list = pancreas.list, anchor.features = pancreas.features, 
-    verbose = FALSE)
+all.features <- SelectIntegrationFeatures(object.list = all.list, nfeatures = 3000)
+all.list <- PrepSCTIntegration(object.list = all.list, anchor.features = all.features, verbose = TRUE)
 ```
 
 ## Identify anchors and integrate datasets. Use the standard workflow, with the exception that normalization.method = 'SCT'
 ```{r}
-pancreas.anchors <- FindIntegrationAnchors(object.list = pancreas.list, normalization.method = "SCT", 
-    anchor.features = pancreas.features, verbose = FALSE)
-pancreas.integrated <- IntegrateData(anchorset = pancreas.anchors, normalization.method = "SCT", 
-    verbose = FALSE)
+all.anchors <- FindIntegrationAnchors(object.list = all.list, normalization.method = "SCT", 
+    anchor.features = all.features, verbose = TRUE)
+all.anchors <- FindIntegrationAnchors(object.list = all.list, normalization.method = "SCT", 
+    anchor.features = all.features, dims = 1:30, verbose = TRUE) # can omit dims but takes a really long time to run
+all.integrated <- IntegrateData(anchorset = all.anchors, normalization.method = "SCT", 
+    verbose = TRUE)
 ```
 
 ## Next, we'll want to proceed with standard downstream analysis (i.e. visualization, clustering) except we will not run the ScaleData function. 
 Note: You can see that after integration, cells group by their biological cell type (which has been pre-annotated), instead of by their underlying technology.
 ```{r}
-pancreas.integrated <- RunPCA(pancreas.integrated, verbose = FALSE)
-pancreas.integrated <- RunUMAP(pancreas.integrated, dims = 1:30)
-plots <- DimPlot(pancreas.integrated, group.by = c("tech", "celltype"), combine = FALSE)
+all.integrated <- RunPCA(all.integrated, verbose = FALSE)
+all.integrated <- RunUMAP(all.integrated, dims = 1:30)
+plots <- DimPlot(all.integrated, group.by = "orig.ident", combine = FALSE)
 plots <- lapply(X = plots, FUN = function(x) x + theme(legend.position = "top") + guides(color = guide_legend(nrow = 3, 
     byrow = TRUE, override.aes = list(size = 3))))
 CombinePlots(plots)
