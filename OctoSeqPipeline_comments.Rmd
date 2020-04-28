@@ -47,12 +47,27 @@ library(stringr)
 # read in csv with the directories
 datafiles <- read.csv("/Users/josongco/Desktop/SeqData/OSdirectories.csv", stringsAsFactors = FALSE)
 str(datafiles) # view the structure of the data frame
+#convert to vector up here (right after reading in) -cmn
+data_dir <- as.vector(datafiles$Directory)
 
 # Parameters: 
 x = 1 # if x is set to 1, data will be from runs 1:3 using original gtf file with ocbim; otherwise, data will be from runs 4:6 using the HiSat gtf file with OCTOgene
 sct = 0 # if sct = 0, data will be taken through standard pre-processing steps; otherwise, data will be taken through scTransform for data pre-processing
 cca = 0 # if cca is set to 0, data will be integrated using a straight merge; otherwise, data will be integrated using anchors via CCA
 ### Want to include parameters to determine npcs, ndims, and res here
+```
+```{r}
+
+## dataset-specific parameters -cmn
+if (x=1) {
+  data_dir = data_dir[1:3]
+  projectName = "originalGTF"
+  rdsName = "~/orignalGTFnonorm.RDS"
+} else if (x=2) {
+  data_dir = data_dir[4:6]
+  projectName = "HiSatGTF"
+  rdsName = "~/orignalGTFnonorm.RDS"
+}
 ```
 
 ## An overview of data processing is as follows:
@@ -66,159 +81,111 @@ The overall data preprocessing steps include options for which raw data (origina
 # Using a for loop, load in Octo Seq Data and take data through pre-processing steps
 ```{r}
 all_list = list() # creates empty list outside of the for loop
-if(x = 1){
+
 for(f in 1:3){
-    data_dir <- as.vector(datafiles$Directory)
-    all <- Read10X(data.dir = data_dir[f])
-    
+  
+  all <- Read10X(data.dir = data_dir[f])
+  
+  ### GTF-specific gene names
+  
+  # Option 1 - original ocbim gene names
+  if (x=1){
     ref <- read.csv("/Users/josongco/Desktop/SeqData/miniNCBI_annotations_alltomitochondria_022420.csv", stringsAsFactors = FALSE)
-      ngenes <- length(all@Dimnames[[1]])
-      for (g in 1:ngenes){
-        gene <- all@Dimnames[[1]][g]
-        gene <- substr(gene, 6, str_length(gene)-2)
-        ind<- grep(gene, ref[[1]])
-        if (length(ind)>0) {
-          id <- ref[[ind[1], 2]]
-          if (str_length(id)>0){
-            id <- str_remove_all(id, "\\(") # parentheses mess up gene names as dimensions
-            id <- str_remove_all(id, "\\)") 
-            id <- substr(id, 1, 60) # keep it short
-            all@Dimnames[[1]][g] <- paste(id, gene, sep= '-')
-        }
-      }
-  }
-  
-all <- CreateSeuratObject(counts = all, project = paste("Run", f, sep = ""), min.cells = 3, min.features = 200)
-#make sure to add this line to append to all_list -cmn
-all_list[[f]] = all
-}
-  
-# To access individual objects: all_list[[1]]
-#example: all_list[[1]] will print the object information on Seurat object 1
-  
-# for now, manually create individual seurat objects to merge and apply std or SCT normalization on individual datasets embedded within a merged object 
-all1 <- all_list[[1]]
-all2 <- all_list[[2]]
-all3 <- all_list[[3]]
-
-# save out so in the future you can just load these datasets (no normalization, only subset min cells and min features)
-saveRDS(all1, "~/all1nonorm.RDS")
-saveRDS(all2, "~/all2nonorm.RDS")
-saveRDS(all3, "~/all3nonorm.RDS")
-
-# can skip previous step -cmn
-saveRDS(all_list, "~/all.RDS")
-# start here to load RDS files with min cells = 3 and min features = 200 instead of starting with raw counts from Talapas
-all1 <- readRDS(file = "/Users/josongco/Desktop/SeqData/all1nonorm.RDS")
-all2 <- readRDS(file = "/Users/josongco/Desktop/SeqData/all2nonorm.RDS")
-all3 <- readRDS(file = "/Users/josongco/Desktop/SeqData/all3nonorm.RDS")
-
-all <- merge(x = all_list[[1]], y = c(all_list[[2]], all_list[[3]]), add.cell.ids = c("Run1", "Run2", "Run3"), project = "OrigGTF", merge.data = FALSE) 
-
-mito.genes <- grep(pattern = "^mitochondria-", x = rownames(x = all), value = TRUE)
-percent.mito <- Matrix::colSums(all) / Matrix::colSums(all)
-all[["percent.mt"]] <- PercentageFeatureSet(all, pattern = "^mitochondria-")
-
-# Use the following visualization techniques to plot features of the Seurat object
-VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3) # visualize the relationship between three variables: nFeature (genes) nCount (UMI counts) and percent.mt (mitochondrial genes)
-plot1 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "percent.mt") # visualize the relationship between UMI counts and mitochondrial genes (percent)
-plot2 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") # visualize the relationship between genes (ID as > 1 UMI count) and mitochondrial genes (percent)
-plot1 + plot2
-
-#reminder: test this next line of code
-all <- subset(all, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5) # set parameters to include cells with the following criteria: > 200, < 2500, less than 5% mitochondrial genes, since a higher number of mitochondrial genes is indicative of stress 
-
-}else{
-  for(f in 4:6){
-    data_dir <- as.vector(datafiles$Directory)
-    all <- Read10X(data.dir = data_dir[f])
-    
-     # Read in name key which has OCTOGene and ocbim names
-    ref <- read.csv("cov4_len200_splice3_strandness_gtf_namekey_singled_edited.csv", stringsAsFactors = FALSE)
     ngenes <- length(all@Dimnames[[1]])
-    
-    # Combine Hisat names with Ocbim names *Note: this step can take some time, but only has to be run once if you save
     for (g in 1:ngenes){
       gene <- all@Dimnames[[1]][g]
-      ind <- grep(gene, ref[[1]])
-      unlist(ind)
-      if (length(ind)>0){
+      gene <- substr(gene, 6, str_length(gene)-2)
+      ind<- grep(gene, ref[[1]])
+      if (length(ind)>0) {
         id <- ref[[ind[1], 2]]
         if (str_length(id)>0){
-          all@Dimnames[[1]][g]  <- paste(id,gene,sep = '-')
+          id <- str_remove_all(id, "\\(") # parentheses mess up gene names as dimensions
+          id <- str_remove_all(id, "\\)") 
+          id <- substr(id, 1, 60) # keep it short
+          all@Dimnames[[1]][g] <- paste(id, gene, sep= '-')
         }
-        
       }
     }
     
-    # Replace underscores with dashes within names
-    for (g in 1:ngenes){
-      gene <- all@Dimnames[[1]][g]
-      new <- str_replace_all(gene, "_", "-")
-      all@Dimnames[[1]][g] <- paste(new)
-    }
-    
-    # Read in "real" gene names
-    ref <- read.csv("refMaster.csv", stringsAsFactors = FALSE)
-    ngenes <- length(all@Dimnames[[1]])
+    ### Options 2 - HiSat gene names
+    if (x=2){
+      # Read in name key which has OCTOGene and ocbim names
+      ref <- read.csv("cov4_len200_splice3_strandness_gtf_namekey_singled_edited.csv", stringsAsFactors = FALSE)
+      ngenes <- length(all@Dimnames[[1]])
+      
+      # Combine Hisat names with Ocbim names *Note: this step can take some time, but only has to be run once if you save
+      for (g in 1:ngenes){
+        gene <- all@Dimnames[[1]][g]
+        ind <- grep(gene, ref[[1]])
+        unlist(ind)
+        if (length(ind)>0){
+          id <- ref[[ind[1], 2]]
+          if (str_length(id)>0){
+            all@Dimnames[[1]][g]  <- paste(id,gene,sep = '-')
+          }
+        }
+      }
+      
+      # Replace underscores with dashes within names
+      for (g in 1:ngenes){
+        gene <- all@Dimnames[[1]][g]
+        new <- str_replace_all(gene, "_", "-")
+        all@Dimnames[[1]][g] <- paste(new)
+      }
+      
+      # Read in "real" gene names
+      ref <- read.csv("refMaster.csv", stringsAsFactors = FALSE)
+      ngenes <- length(all@Dimnames[[1]])
       # Remove parentheses from names
-    ref <- lapply(ref, gsub, pattern='\\(', replacement=' ')
-    ref <- lapply(ref, gsub, pattern='\\)', replacement=' ')
-    ref <- lapply(ref, gsub, pattern='_', replacement='-')
-    ref$id = substr(ref$id, 1, 10)
+      ref <- lapply(ref, gsub, pattern='\\(', replacement=' ')
+      ref <- lapply(ref, gsub, pattern='\\)', replacement=' ')
+      ref <- lapply(ref, gsub, pattern='_', replacement='-')
+      ref$id = substr(ref$id, 1, 10)
       # Add on real gene names; can take some time but only has to be run once if you save
-    ref2 <- data.frame(ref)
-    for (g in 1:ngenes){
-      gene <- all@Dimnames[[1]][g]
-      unlistgene <- unlist(strsplit(gene, "-"))
-      geneList <- list()
-      for (i in unlistgene){
-        beginning <- substr(i, 0, 6)
-        if(beginning == "Ocbimv"){
-          ind <- grep(i, ref2$ncbi)
-          idlist <- list(droplevels(factor(ref2$id[ind])))
-          geneList <- c(geneList, idlist)
-          all@Dimnames[[1]][g] <- (paste(gene, (paste(unlist(geneList), collapse='-')),sep='-')[1])
+      ref2 <- data.frame(ref)
+      for (g in 1:ngenes){
+        gene <- all@Dimnames[[1]][g]
+        unlistgene <- unlist(strsplit(gene, "-"))
+        geneList <- list()
+        for (i in unlistgene){
+          beginning <- substr(i, 0, 6)
+          if(beginning == "Ocbimv"){
+            ind <- grep(i, ref2$ncbi)
+            idlist <- list(droplevels(factor(ref2$id[ind])))
+            geneList <- c(geneList, idlist)
+            all@Dimnames[[1]][g] <- (paste(gene, (paste(unlist(geneList), collapse='-')),sep='-')[1])
+          }
         }
       }
     }
+    
+    
+    all <- CreateSeuratObject(counts = all, project = paste("Run", f, sep = ""), min.cells = 3, min.features = 200)
+    #make sure to add this line to append to all_list -cmn
+    all_list[[f]] = all
+  }
   
-all <- CreateSeuratObject(counts = all, project = paste("Run", f, sep = ""), min.cells = 3, min.features = 200)
-
-}
+  # can skip previous step -cmn
+  saveRDS(all_list, rdsName)
+  # start here to load RDS files with min cells = 3 and min features = 200 instead of starting with raw counts from Talapas
   
-# To access individual objects: all_list[[1]]
-#example: all_list[[1]] will print the object information on Seurat object 1
+  #just read all in at once -cmn
+  all_list<- readRDS(file = rdsName)
   
-# for now, manually create individual seurat objects to merge and apply std or SCT normalization on individual datasets embedded within a merged object 
-all1 <- all_list[[4]]
-all2 <- all_list[[5]]
-all3 <- all_list[[6]]
-
-# save out so in the future you can just load these datasets (no normalization, only subset min cells and min features)
-saveRDS(all4, "~/all4nonorm.RDS")
-saveRDS(all5, "~/all5nonorm.RDS")
-saveRDS(all6, "~/all6nonorm.RDS")
-
-# start here to load RDS files with min cells = 3 and min features = 200 instead of starting with raw counts from Talapas
-all4 <- readRDS(file = "/Users/josongco/Desktop/SeqData/all4nonorm.RDS")
-all5 <- readRDS(file = "/Users/josongco/Desktop/SeqData/all5nonorm.RDS")
-all6 <- readRDS(file = "/Users/josongco/Desktop/SeqData/all6nonorm.RDS")
-
-all <- merge(x = all4, y = c(all5, all6), add.cell.ids = c("HSrun1", "HSrun2", "HSrun3"), project = "HiSatGTF", merge.data = FALSE) 
-
-mito.genes <- grep(pattern = "^mitochondria-", x = rownames(x = all), value = TRUE)
-percent.mito <- Matrix::colSums(all) / Matrix::colSums(all)
-all[["percent.mt"]] <- PercentageFeatureSet(all, pattern = "^mitochondria-")
-
-# Use the following visualization techniques to plot features of the Seurat object
-VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3) # visualize the relationship between three variables: nFeature (genes) nCount (UMI counts) and percent.mt (mitochondrial genes)
-plot1 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "percent.mt") # visualize the relationship between UMI counts and mitochondrial genes (percent)
-plot2 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") # visualize the relationship between genes (ID as > 1 UMI count) and mitochondrial genes (percent)
-plot1 + plot2
-
-#reminder: test this next line of code
-all <- subset(all, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5) # set parameters to include cells with the following criteria: > 200, < 2500, less than 5% mitochondrial genes, since a higher number of mitochondrial genes is indicative of stress 
+  all <- merge(x = all_list[[1]], y = c(all_list[[2]], all_list[[3]]), add.cell.ids = c("Run1", "Run2", "Run3"), project = "OrigGTF", merge.data = FALSE) 
+  
+  mito.genes <- grep(pattern = "^mitochondria-", x = rownames(x = all), value = TRUE)
+  percent.mito <- Matrix::colSums(all) / Matrix::colSums(all)
+  all[["percent.mt"]] <- PercentageFeatureSet(all, pattern = "^mitochondria-")
+  
+  # Use the following visualization techniques to plot features of the Seurat object
+  VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3) # visualize the relationship between three variables: nFeature (genes) nCount (UMI counts) and percent.mt (mitochondrial genes)
+  plot1 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "percent.mt") # visualize the relationship between UMI counts and mitochondrial genes (percent)
+  plot2 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") # visualize the relationship between genes (ID as > 1 UMI count) and mitochondrial genes (percent)
+  plot1 + plot2
+  
+  #reminder: test this next line of code
+  all <- subset(all, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5) # set parameters to include cells with the following criteria: > 200, < 2500, less than 5% mitochondrial genes, since a higher number of mitochondrial genes is indicative of stress 
   
 }
 ```
@@ -228,69 +195,57 @@ Note: option for standard normalization vs SCTransform
 ```{r}
 all.list <- SplitObject(all, split.by = "orig.ident")
 if(sct = 0){
-for (i in 1:length(all.list)) {
+  for (i in 1:length(all.list)) {
     all.list[[i]] <- NormalizeData(all.list[[i]]) # applies a Log Normalize by scale factor of 10,000 as default
     all.list[[i]] <- FindVariableFeatures(all.list[[i]], selection.method = "vst", nfeatures = 2000)
     all.list[[i]] <- ScaleData(all.list[[i]], vars.to.regress = "nCount_RNA")
-    }
+  }
   
-## ID highly variable features (feature selection) 
-# To calculate a subset of features that exhibit high cell-to-cell variation in the dataset (i.e. genes that are highly expressed in some cells and lowly expressed in others), the following function returns 2,000 features per data set, which will be used in downstream analyses like PCA
-all <- FindVariableFeatures(all, selection.method = "vst", nfeatures = 2000)
-top10 <- head(VariableFeatures(all), 10) # ID 10 most highly variable genes
-plot1 <- VariableFeaturePlot(all)
-plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
-plot1 + plot2
-
-## Scale the data: this is a standard pre-processing step required for dimensional reduction techniques
-# Applies a linear transformation: 1) shifts the expression of each gene so that the mean expression across cells is 0, 2) scales the expression of each gene so that the variance across cells is 1, allowing for downstream analyses to utilize equal weight of each gene so that highly-expressed genes do not dominate; 3) results will be stored in all[["RNA]]@scale.data
-all.genes <- rownames(all)
-all <- ScaleData(all, vars.to.regress = "nCount_RNA", "percent.mt") # regress out UMI counts and percent.mt which is helpful when integrating v2 and v3 chemistry; alt: all <- ScaleData(all, features = all.genes)
-
- }else {
+  ## ID highly variable features (feature selection) 
+  # To calculate a subset of features that exhibit high cell-to-cell variation in the dataset (i.e. genes that are highly expressed in some cells and lowly expressed in others), the following function returns 2,000 features per data set, which will be used in downstream analyses like PCA
+  all <- FindVariableFeatures(all, selection.method = "vst", nfeatures = 2000)
+  top10 <- head(VariableFeatures(all), 10) # ID 10 most highly variable genes
+  plot1 <- VariableFeaturePlot(all)
+  plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+  plot1 + plot2
+  
+  ## Scale the data: this is a standard pre-processing step required for dimensional reduction techniques
+  # Applies a linear transformation: 1) shifts the expression of each gene so that the mean expression across cells is 0, 2) scales the expression of each gene so that the variance across cells is 1, allowing for downstream analyses to utilize equal weight of each gene so that highly-expressed genes do not dominate; 3) results will be stored in all[["RNA]]@scale.data
+  all.genes <- rownames(all)
+  
+  # looks like ScaleData happened up above (in for loop). should it happen up there or down here? -cmn
+  all <- ScaleData(all, vars.to.regress = "nCount_RNA", "percent.mt") # regress out UMI counts and percent.mt which is helpful when integrating v2 and v3 chemistry; alt: all <- ScaleData(all, features = all.genes)
+  
+}else if (sct=1){   # good practice is to make the "else if" condition explicit rather than just "else", when there is one specific condition rather than "catchall"
   for (i in 1:length(all.list)) {
     all.list[[i]] <- SCTransform(all.list[[i]], verbose = FALSE)
-  }}
+  }
+}
 ```
 
 ## Integrate data sets after normalization before continuing with PCA
 Source: https://satijalab.org/seurat/v3.0/merge_vignette.html
 ```{r}
-if(x=1)
-  if(cca = 0){
-  all <- merge(x = all1, y = c(all2, all3), add.cellids = c("run1", "run2", "run3"), project = "", merge.data = TRUE)
+# don't need to do (x=1) and (x=2) separately
+if(cca = 0){
+  ## Straight merge
+  ## use list (all.list[[1]]) rather than hardcoded names (all1) -cmn
+  all <- merge(x = all.list[[1]], y = c(all.list[[2]], all.list[[3]]), add.cellids = c("run1", "run2", "run3"), project = "", merge.data = TRUE)
   GetAssayData(all) [1:10, 1:15]
-  } else {
+} else if(cc=1){  # make "else if" explicit
   ## Select features for downstream integration (run PrepSCTIntegration so that all necessary Pearson residuals have been calculated is SCT applied on dataset before merging)
-    all.features <- SelectIntegrationFeatures(object.list = all.list, nfeatures = 3000)
-    all.list <- PrepSCTIntegration(object.list = all.list, anchor.features = all.features, verbose = TRUE)
-
-## Identify anchors and integrate datasets. Use the standard workflow, with the exception that normalization.method = 'SCT'
-all.anchors <- FindIntegrationAnchors(object.list = all.list, normalization.method = "SCT", 
-    anchor.features = all.features, verbose = TRUE)
-all.anchors <- FindIntegrationAnchors(object.list = all.list, normalization.method = "SCT", 
-    anchor.features = all.features, dims = 1:30, verbose = TRUE) # can omit dims but takes a really long time to run
-all.integrated <- IntegrateData(anchorset = all.anchors, normalization.method = "SCT", 
-    verbose = TRUE)
-all <- all.integrated 
-   } else {
-     if(cca = 0){
-   all <- merge(x = all4, y = c(all5, all6), add.cellids = c("HSrun1", "HSrun2", "HSrun3"), project = "", merge.data = TRUE)
-    GetAssayData(all) [1:10, 1:15]
-   } else {
-  ## Select features for downstream integration (run PrepSCTIntegration so that all necessary Pearson residuals have been calculated is SCT applied on dataset before merging)
-    all.features <- SelectIntegrationFeatures(object.list = all.list, nfeatures = 3000)
-    all.list <- PrepSCTIntegration(object.list = all.list, anchor.features = all.features, verbose = TRUE)
-
-## Identify anchors and integrate datasets. Use the standard workflow, with the exception that normalization.method = 'SCT'
-all.anchors <- FindIntegrationAnchors(object.list = all.list, normalization.method = "SCT", 
-    anchor.features = all.features, verbose = TRUE)
-all.anchors <- FindIntegrationAnchors(object.list = all.list, normalization.method = "SCT", 
-    anchor.features = all.features, dims = 1:30, verbose = TRUE) # can omit dims but takes a really long time to run
-all.integrated <- IntegrateData(anchorset = all.anchors, normalization.method = "SCT", 
-    verbose = TRUE)
-all <- all.integrated
-}}
+  
+  # this section is all SCT. probably want to have an if/else to have standard CCA integration here -cmn
+  all.features <- SelectIntegrationFeatures(object.list = all.list, nfeatures = 3000)
+  all.list <- PrepSCTIntegration(object.list = all.list, anchor.features = all.features, verbose = TRUE)
+  
+  ## Identify anchors and integrate datasets. Use the standard workflow, with the exception that normalization.method = 'SCT'
+  all.anchors <- FindIntegrationAnchors(object.list = all.list, normalization.method = "SCT",  anchor.features = all.features, verbose = TRUE)
+  all.anchors <- FindIntegrationAnchors(object.list = all.list, normalization.method = "SCT",  anchor.features = all.features, dims = 1:30, verbose = TRUE) # can omit dims but takes a really long time to run
+  all.integrated <- IntegrateData(anchorset = all.anchors, normalization.method = "SCT",  verbose = TRUE)
+  all <- all.integrated 
+} 
+# deleted "else" for x=2, not needed
 ```
 
 ## Next, we'll want to proceed with standard downstream analysis (i.e. visualization, clustering) except we will not run the ScaleData function. 
@@ -299,13 +254,14 @@ all <- all.integrated
 all <- RunPCA(all, npcs = 30, verbose = FALSE)
 all <- RunUMAP(all, dims = 1:30)
 plots <- DimPlot(all, group.by = "orig.ident", combine = FALSE)
-plots <- lapply(X = plots, FUN = function(x) x + theme(legend.position = "top") + guides(color = guide_legend(nrow = 3, 
-    byrow = TRUE, override.aes = list(size = 3))))
+plots <- lapply(X = plots, FUN = function(x) x + theme(legend.position = "top") + guides(color = guide_legend(nrow = 3, byrow = TRUE, override.aes = list(size = 3))))
 CombinePlots(plots)
 ```
 
 ## Examine and visualize PCA results in a few different ways, comment out those that you don't need to visualize
 ```{r}
+
+#note - name changes from all to allOSnorm here  -cmn
 print(allOSnorm[["pca"]], dims = 1:5, nfeatures = 5)
 
 VizDimLoadings(allOSnorm, dims = 1:2, reduction = "pca")
@@ -325,8 +281,9 @@ DimHeatmap(allOSnorm, dims = 1:10, cells = 500, balanced = TRUE)
 
 ## Clustering steps
 ```{r}
-all <- cbind(all.list)
-j <- 1:3
+all <- cbind(all.list) #not sure what this is for here. data has already been merged above -cmn
+j <- 1:3 # i don't think j gets used -cmn
+# is there a reason to change name in the next line? -cmn
 allnorm <- RunPCA(all@var.genes, npcs = 30, verbose = TRUE)
 allnorm <- FindNeighbors(all, dims = 1:30)
 allnorm <- FindClusters(allnorm, reduction.type = "pca", dims = 1:30, resolution = 1)
@@ -337,7 +294,7 @@ DimPlot(allnorm, reduction = "umap", pt.size = 1)
 
 ## Building a dendogram to reflect hierarchical clustering
 ```{r}
-allOSnorm.tree <- BuildClusterTree(allOSnorm, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = 1:20)
+allOSnorm.tree <- BuildClusterTree(allOSnorm, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = 1:20) # dims changes here
 pdf("clusterTree.pdf", height = 4.5, width = 7)
 PlotclusterTree(allOSnorm.tree)
 dev.off()
@@ -347,6 +304,9 @@ pdf("hierarchicalTree.pdf", height = 7, width = 10)
 DimPlot(allOSnorm.tree, reduction = "umap", label = TRUE, pt.size = 1)
 dev.off()
 ```
+
+## this would be a good place to plot known features -cmn
+## also, can see bottom of clustering_cmn.Rmd for quick way of doing gene families -cmn
 
 ## Finding markers
 ```{r}
@@ -368,7 +328,7 @@ if (t = 1){
   saveRDS (octo.markers, file = ".rds")
   
 }else{
-   cluster1.markersROC <- FindMarkers(allOsnorm, ident.1 = 1, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
+  cluster1.markersROC <- FindMarkers(allOsnorm, ident.1 = 1, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
   head(cluster1.markersROC, n = 2)
   VlnPlot(allOSnorm.tree, features = c("", "", ""))
   
@@ -404,19 +364,19 @@ DevoGenes$fullName=""
 #This loop searches for the full names of the DevoGenes within the octo.norm object
 #and then pastes them into the new "fullname" column
 for (row in 1:nrow(DevoGenes)){
- p = DevoGenes[row,"ID"]
- #print(p)
- newName = grep(pattern = p, x = rownames(x = octo.norm), value = TRUE)
- if (identical(newName,character(0))){
-   DevoGenes$fullName[row] = "none"
- }
- else if (length(newName) != 1){
-   l = length(newName)
-   DevoGenes$fullName[row] = newName[l]
- }
- else{
-   DevoGenes$fullName[row] = newName
- }
+  p = DevoGenes[row,"ID"]
+  #print(p)
+  newName = grep(pattern = p, x = rownames(x = octo.norm), value = TRUE)
+  if (identical(newName,character(0))){
+    DevoGenes$fullName[row] = "none"
+  }
+  else if (length(newName) != 1){
+    l = length(newName)
+    DevoGenes$fullName[row] = newName[l]
+  }
+  else{
+    DevoGenes$fullName[row] = newName
+  }
 }
 
 
@@ -426,9 +386,9 @@ for (row in 1:nrow(DevoGenes)){
 #For those, I found them in IGV and manually created the figures outside of the loop
 DevoGenesN = data.frame()
 for (row in 1:nrow(DevoGenesN)){
- if (DevoGenes$fullName[row] != "none"){
-   DevoGenesN <- rbind(DevoGenesN, DevoGenes[row,])
- }
+  if (DevoGenes$fullName[row] != "none"){
+    DevoGenesN <- rbind(DevoGenesN, DevoGenes[row,])
+  }
 }
 
 
@@ -451,71 +411,72 @@ setwd("C:/Users/User/Documents/MillerLab/cellranger")
 #This loop runs each row in DevoGenesN and prints out a png file for each type of graph
 #Make sure to set the working directory to a place that you want all these figures to be saved!
 for (row in 1:nrow(DevoGenesN)){
-
-
-
- name = DevoGenesN$fullName[row]
- name2 = DevoGenesN$fullName[row]
- name2 <- lapply(name2, gsub, pattern='/', replacement='-')
- name2 <- lapply(name2, gsub, pattern='\\?', replacement='-')
- name2 <- lapply(name2, gsub, pattern=' ', replacement='-')
- name2 <- lapply(name2, gsub, pattern='\\"', replacement='-')
- name2 <- substr(name2,1,60)
- gene = DevoGenesN$Gene[row]
-
-
- vlnplotName = paste(gene, name2, "vlnplot.png", sep = "_")
- png(vlnplotName, width = 900, height = 700)
- vln <- VlnPlot(octo.normTREE, features = name)
- print(vln)
- dev.off()
-
-
-
- dotplotName = paste(gene, name2,'dotplot.png', sep = '_')
- png(dotplotName, width = 900, height = 700)
- dp <- DotPlot(octo.normTREE, features = name)
- print(dp)
- dev.off()
-
-
- featureplotName = paste(gene, name2,'featureplot.png', sep = '_')
- png(featureplotName, width = 900, height = 700)
- fp <- FeaturePlot(octo.normTREE, features = name, sort.cell = TRUE, pt.size = 1.5)
- print(fp)
- dev.off()
+  
+  
+  
+  name = DevoGenesN$fullName[row]
+  name2 = DevoGenesN$fullName[row]
+  name2 <- lapply(name2, gsub, pattern='/', replacement='-')
+  name2 <- lapply(name2, gsub, pattern='\\?', replacement='-')
+  name2 <- lapply(name2, gsub, pattern=' ', replacement='-')
+  name2 <- lapply(name2, gsub, pattern='\\"', replacement='-')
+  name2 <- substr(name2,1,60)
+  gene = DevoGenesN$Gene[row]
+  
+  
+  vlnplotName = paste(gene, name2, "vlnplot.png", sep = "_")
+  png(vlnplotName, width = 900, height = 700)
+  vln <- VlnPlot(octo.normTREE, features = name)
+  print(vln)
+  dev.off()
+  
+  
+  
+  dotplotName = paste(gene, name2,'dotplot.png', sep = '_')
+  png(dotplotName, width = 900, height = 700)
+  dp <- DotPlot(octo.normTREE, features = name)
+  print(dp)
+  dev.off()
+  
+  
+  featureplotName = paste(gene, name2,'featureplot.png', sep = '_')
+  png(featureplotName, width = 900, height = 700)
+  fp <- FeaturePlot(octo.normTREE, features = name, sort.cell = TRUE, pt.size = 1.5)
+  print(fp)
+  dev.off()
 }
 
 ```
 
 ```{r}
 for (row in 1:nrow(GenesIDV)){
-
- name = GenesIDV$fullName[row]
- name2 = GenesIDV$fullName[row]
- name2 <- lapply(name2, gsub, pattern='/', replacement='-')
- name2 <- lapply(name2, gsub, pattern='\\?', replacement='-')
- name2 <- lapply(name2, gsub, pattern=' ', replacement='-')
- name2 <- lapply(name2, gsub, pattern='\\"', replacement='-')
- name2 <- substr(name2,1,60)
- gene = GenesIDV$Gene[row]
- 
- vlnplotName = paste(gene, name2, "vlnplot.png", sep = "_")
- png(vlnplotName, width = 900, height = 700)
- vln <- VlnPlot(all.tree, features = name)
- print(vln)
- dev.off()
-
-
- dotplotName = paste(gene, name2,'dotplot.png', sep = '_')
- png(dotplotName, width = 900, height = 700)
- dp <- DotPlot(all.tree, features = name)
- print(dp)
- dev.off()
-
-
- featureplotName = paste(gene, name2,'featureplot.png', sep = '_')
- png(featureplotName, width = 900, height = 700)
- fp <- FeaturePlot(all.tree, features = name, sort.cell = TRUE, pt.size = 1.5)
- print(fp)
- dev.off()
+  
+  name = GenesIDV$fullName[row]
+  name2 = GenesIDV$fullName[row]
+  name2 <- lapply(name2, gsub, pattern='/', replacement='-')
+  name2 <- lapply(name2, gsub, pattern='\\?', replacement='-')
+  name2 <- lapply(name2, gsub, pattern=' ', replacement='-')
+  name2 <- lapply(name2, gsub, pattern='\\"', replacement='-')
+  name2 <- substr(name2,1,60)
+  gene = GenesIDV$Gene[row]
+  
+  vlnplotName = paste(gene, name2, "vlnplot.png", sep = "_")
+  png(vlnplotName, width = 900, height = 700)
+  vln <- VlnPlot(all.tree, features = name)
+  print(vln)
+  dev.off()
+  
+  
+  dotplotName = paste(gene, name2,'dotplot.png', sep = '_')
+  png(dotplotName, width = 900, height = 700)
+  dp <- DotPlot(all.tree, features = name)
+  print(dp)
+  dev.off()
+  
+  
+  featureplotName = paste(gene, name2,'featureplot.png', sep = '_')
+  png(featureplotName, width = 900, height = 700)
+  fp <- FeaturePlot(all.tree, features = name, sort.cell = TRUE, pt.size = 1.5)
+  print(fp)
+  dev.off()
+  
