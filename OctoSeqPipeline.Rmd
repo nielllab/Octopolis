@@ -45,7 +45,7 @@ library(stringr)
 ## Creating data frames and setting parameters for data analysis
 ```{r}
 # read in csv with the directories
-datafiles <- read.csv("/Users/josongco/Desktop/SeqData/OSdirectories.csv", stringsAsFactors = FALSE)
+datafiles <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/OSdirectories.csv", stringsAsFactors = FALSE)
 str(datafiles) # view the structure of the data frame
 
 # Parameters: 
@@ -65,13 +65,12 @@ The overall data preprocessing steps include options for which raw data (origina
 
 # Using a for loop, load in Octo Seq Data and take data through pre-processing steps
 ```{r}
+data_dir <- as.vector(datafiles$Directory)
 all_list = list() # creates empty list outside of the for loop
 if(x = 1){
+   ref <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/refMaster_042720.csv", stringsAsFactors = FALSE)
 for(f in 1:3){
-    data_dir <- as.vector(datafiles$Directory)
     all <- Read10X(data.dir = data_dir[f])
-    
-    ref <- read.csv("/Users/josongco/Desktop/SeqData/miniNCBI_annotations_alltomitochondria_022420.csv", stringsAsFactors = FALSE)
       ngenes <- length(all@Dimnames[[1]])
       for (g in 1:ngenes){
         gene <- all@Dimnames[[1]][g]
@@ -86,10 +85,9 @@ for(f in 1:3){
             all@Dimnames[[1]][g] <- paste(id, gene, sep= '-')
         }
       }
-  }
-  
-all <- CreateSeuratObject(counts = all, project = paste("Run", f, sep = ""), min.cells = 3, min.features = 200)
-
+  all <- CreateSeuratObject(counts = all, project = paste("Run", f, sep = ""), min.cells = 3, min.features = 200)
+   all_list[[f]] = all   
+   }
 }
   
 # To access individual objects: all_list[[1]]
