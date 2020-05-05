@@ -32,11 +32,13 @@ Note that the `echo = FALSE` parameter was added to the code chunk to prevent pr
 
 Merge and then normalize (source: https://davetang.org/muse/2018/01/24/merging-two-10x-single-cell-datasets/)
 ```{r}
-alln1 <- NormalizeData(all1)
-alln2 <- NormalizeData(all2)
-alln3 <- NormalizeData(all3)
 
-allTRY <- merge(x = alln1, y = c(alln2, alln3), add.cell.ids = c("Run1", "Run2", "Run3"), project = "Norm_merge_postev")
+
+alln1 <- NormalizeData(all_list[[1]])
+alln2 <- NormalizeData(all_list[[2]])
+alln3 <- NormalizeData(all_list[[3]])
+
+all <- merge(x = alln1, y = c(alln2, alln3), add.cell.ids = c("Run1", "Run2", "Run3"), project = "Norm_merge_postev")
 
 mito.genes <- grep(pattern = "^mitochondria-", x = rownames(x = allTRY), value = TRUE)
 percent.mito <- Matrix::colSums(allTRY) / Matrix::colSums(allTRY)
