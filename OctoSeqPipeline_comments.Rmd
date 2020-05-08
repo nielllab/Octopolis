@@ -45,13 +45,13 @@ library(stringr)
 ## Creating data frames and setting parameters for data analysis
 ```{r}
 # read in csv with the directories
-datafiles <- read.csv("/Users/josongco/Desktop/SeqData/OSdirectories.csv", stringsAsFactors = FALSE)
+datafiles <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/OSdirectories.csv", stringsAsFactors = FALSE)
 str(datafiles) # view the structure of the data frame
 #convert to vector up here (right after reading in) -cmn
 data_dir <- as.vector(datafiles$Directory)
 
 # Parameters: 
-x = 1 # if x is set to 1, data will be from runs 1:3 using original gtf file with ocbim; otherwise, data will be from runs 4:6 using the HiSat gtf file with OCTOgene
+genemodel = 1 # if x is set to 1, data will be from runs 1:3 using original gtf file with ocbim; otherwise, data will be from runs 4:6 using the HiSat gtf file with OCTOgene
 sct = 0 # if sct = 0, data will be taken through standard pre-processing steps; otherwise, data will be taken through scTransform for data pre-processing
 cca = 0 # if cca is set to 0, data will be integrated using a straight merge; otherwise, data will be integrated using anchors via CCA
 ### Want to include parameters to determine npcs, ndims, and res here
@@ -59,11 +59,11 @@ cca = 0 # if cca is set to 0, data will be integrated using a straight merge; ot
 ```{r}
 
 ## dataset-specific parameters -cmn
-if (x=1) {
+if (genemodel=1) {
   data_dir = data_dir[1:3]
   projectName = "originalGTF"
   rdsName = "~/orignalGTFnonorm.RDS"
-} else if (x=2) {
+} else if (genemodel=2) {
   data_dir = data_dir[4:6]
   projectName = "HiSatGTF"
   rdsName = "~/orignalGTFnonorm.RDS"
@@ -90,7 +90,7 @@ for(f in 1:3){
   
   # Option 1 - original ocbim gene names
   if (x=1){
-    ref <- read.csv("/Users/josongco/Desktop/SeqData/miniNCBI_annotations_alltomitochondria_022420.csv", stringsAsFactors = FALSE)
+    ref <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/refMaster_042720.csv", stringsAsFactors = FALSE)
     ngenes <- length(all@Dimnames[[1]])
     for (g in 1:ngenes){
       gene <- all@Dimnames[[1]][g]
@@ -110,7 +110,7 @@ for(f in 1:3){
     ### Options 2 - HiSat gene names
     if (x=2){
       # Read in name key which has OCTOGene and ocbim names
-      ref <- read.csv("cov4_len200_splice3_strandness_gtf_namekey_singled_edited.csv", stringsAsFactors = FALSE)
+      ref <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/cov4_len200_splice3_strandness_gtf_namekey_singled_edited.csv", stringsAsFactors = FALSE)
       ngenes <- length(all@Dimnames[[1]])
       
       # Combine Hisat names with Ocbim names *Note: this step can take some time, but only has to be run once if you save
