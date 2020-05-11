@@ -69,7 +69,7 @@ The overall data preprocessing steps include options for which raw data (origina
 all_list = list() # creates empty list outside of the for loop
 if(x == 1){
     ref <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/refMaster_042720.csv", stringsAsFactors = FALSE)
-for(f in 1:3){
+for(f in 2:3){
     all <- Read10X(data.dir = data_dir[f])
       ngenes <- length(all@Dimnames[[1]])
       for (g in 1:ngenes){
@@ -90,7 +90,7 @@ for(f in 1:3){
   all_list[[f]] = all    
 }
 
-saveRDS(all_list, "~/all_list.rds")
+saveRDS(all_list, "~/all_listv3.rds")
 
 # Read in rds file: all_list1 <- readRDS("~/all_list.rds")
   
