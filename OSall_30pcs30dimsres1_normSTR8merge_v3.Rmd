@@ -1,5 +1,5 @@
 ---
-title: "Straight merge of v3 chemistry-with updated csv"
+title: "Straight merge of v3 chemistry (std norm)"
 author: "jos"
 date: "05/11/2020"
 output:
@@ -16,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Read in data
 Using the OctoSeqPipeline Code, I used a for loop to read in the v3 datasets from the original GTF. I set parameters to include a min.cell = 3 and min.features = 200. 
 ```{r , echo = FALSE}
-# to knit document, use the following code: rmarkdown::render("/Users/josongco/Desktop/SeqData/Code/OSall_30pcs30dimsres1_normSTR8merge_v3.Rmd")
+# to knit document, use the following code: rmarkdown::render("/Users/josongco/Documents/GitHub/Octopolis/OSall_30pcs30dimsres1_normSTR8merge_v3.Rmd")
 library(Seurat)
 library(Matrix)
 library(ggplot2)
@@ -27,13 +27,14 @@ library(stringr)
 ## Read in normalized datasets
 I performed normalization on the individual datasets before conducting a straight merge. I used the "merge" function to create a new Seurat object "all" for downstream analyses but preserved the original identities of the individual datasets via the merge argument "add.cell.ids".
 ```{r}
-for (i in 2:length(all_list)){
-  all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command
-  all_list[[i]] <- NormalizeData(all_list[[i]])
-}
+#for (i in 2:length(all_list)){
+ # all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command
+  #all_list[[i]] <- NormalizeData(all_list[[i]])
+#}
 
-saveRDS(all_list, "/Users/josongco/Desktop/SeqData/allnormV3.rds")
-all <- merge(x = all_list[[2]], y = all_list[[3]], add.cell.ids = project = paste("Run", i, sep = ""), project = "StdN_str8_v3")
+#all <- merge(x = all_list[[2]], y = all_list[[3]], add.cell.ids = c("Run2", "Run3"), project = "StdN_str8_v3")
+#saveRDS(all, "/Users/josongco/Desktop/SeqData/allnormV3.rds")
+
 all <- readRDS("/Users/josongco/Desktop/SeqData/allnormV3.rds")
 ```
 
