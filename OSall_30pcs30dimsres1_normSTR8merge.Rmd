@@ -1,0 +1,146 @@
+---
+title: "Straight merge of all three datasets"
+author: "jos"
+date: "4/24/2020"
+output:
+  html_document: 
+    fig_height: 12
+    fig_width: 15
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Objective: use a for loop to read in and process all 3 data sets from the original GTF and conduct a straight merge with standard normalization.
+
+## Read in data
+Using the OctoSeqPipeline Code, I used a for loop to read in all three datasets from the original GTF. I set parameters to include a min.cell = 3 and min.features = 200. Then I saved out the individual datasets as all1.RDS, all2.RDS, and all3.RDS. [H1: I chose to save out the individual RDS files because I had a few issues with trying to make sure that the objects' original identities were preserved and figured I could come back to this step in the future.] 
+```{r linewidth=60, echo = FALSE}
+# to knit document, use the following code: rmarkdown::render("/Users/josongco/Desktop/SeqData/Code/OSall_30pcs30dimsres1_normSTR8merge.Rmd")
+library(Seurat)
+library(Matrix)
+library(ggplot2)
+library(sctransform)
+library(stringr)
+```
+
+## Read in normalized datasets
+I then shifted over to a new Rmd to keep the trial-and-error code separate from the OctoSeqPipeline. I titled this "draft of straight merge". In this Rmd, I performed normalization on the individual datasets before conducting a straight merge. I used the "merge" function to create a new Seurat object "allTRY" for downstream analyses but preserved the original identities of the individual datasets via the merge argument "add.cell.ids". This project was titled "Norm_postev" for normalization first, then all downstream analyses are performed on a merged object
+```{r linewidth=60, echo = FALSE}
+#alln1 <- readRDS(file = "/Users/josongco/Desktop/SeqData/alln1_stdmerge.rds")
+#alln2 <- readRDS(file = "/Users/josongco/Desktop/SeqData/alln2_stdmerge.rds")
+#alln3 <- readRDS(file = "/Users/josongco/Desktop/SeqData/alln3_stdmerge.rds")
+
+#allTRY <- merge(x = alln1, y = c(alln2, alln3), add.cell.ids = c("Run1", "Run2", "Run3"), project = "Norm_merge_postev")
+```
+
+```{r}
+allTRY <- readRDS("/Users/josongco/Desktop/SeqData/allTRY.rds")
+mito.genes <- grep(pattern = "^mitochondria-", x = rownames(x = allTRY), value = TRUE)
+percent.mito <- Matrix::colSums(allTRY) / Matrix::colSums(allTRY)
+allTRY[["percent.mt"]] <- PercentageFeatureSet(allTRY, pattern = "^mitochondria-")
+```
+## Conduct a straight merge and plot features of the object. 
+I extracted out the percent.mt information from the merged object using a grep command. Then I used visualization techniques to plot nFeature, nCount, and percent.mt for each of the Runs in the merged object. (Note: nFeature = # genes, nCount = UMI counts, and percent.mt is important because higher levels of percent.mt are indicative of cell stress.) Typically, I would subset the data to only include nFeatures >200, <2500, and percent.mt <5. However, even though I used visualization techniques to plot these features, I did not end up subsetting the data.
+```{r linewidth=60}
+VlnPlot(allTRY, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+plot1 <- FeatureScatter(allTRY, feature1 = "nCount_RNA", feature2 = "percent.mt")
+# visualize the relationship between UMI counts and mitochondrial genes (percent)
+plot2 <- FeatureScatter(allTRY, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") 
+# visualize the relationship between genes (ID as >1 UMI) and mitochondrial genes
+plot1 + plot2
+```
+
+## Determine variable features
+I then found variable features and plotted the top10 variable features. Next, I scaled the data. I initially tried to regress out nCount and percent.mt but was not able to regress out nCount successfully. For example, when I left in nCount as part of the vars.to.regress argument, I moved on to the next step, which is to perform PCA, but received an error saying the data was not scaled. I went back to the ScaleData function and figured I would try to regress out only percent.mt. I performed the ScaleData set again only regressing out percent.mt then when I moved onto RunPCA, I was able to proceed. [H2: figure out how to regress out nCount_RNA.]
+```{r linewidth=60}
+allTRY <- FindVariableFeatures(allTRY, selection.method = "vst", nfeatures = 2000)
+top10 <- head(VariableFeatures(allTRY), 10) # ID 10 most highly variable genes
+plot1 <- VariableFeaturePlot(allTRY)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+print(plot1)
+print(plot2)
+```
+
+## Run PCA and generate UMAP
+I performed PCA and all downstream analyses on 30 pcs, 30 dims, and a resolution of 1. I then plotted the UMAP based on this original analysis and then again with the Runs mapped on top of the clusters. We're able to see that a straight merge does not integrate the data as well as CCA does. 
+```{r linewidth=60}
+allTRY <- ScaleData(allTRY, vars.to.regress = "percent.mt") 
+# unable to regress out nCount_RNA, which causes the ScaleData 
+# to not properly store information which is necessary for RunPCA function
+allTRY <- RunPCA(allTRY, npcs = 30, verbose = FALSE) 
+allTRY <- FindNeighbors(allTRY, dims = 1:30)
+allTRY <- FindClusters(allTRY, reduction = "pca", dims = 1:30, resolution = 1)
+allTRY <- RunUMAP(allTRY, reduction = "pca", dims = 1:30)
+DimPlot(allTRY, reduction = "umap", label = TRUE)
+DimPlot(allTRY, reduction = "umap", group.by = "orig.ident")
+```
+
+## Examine cell-cluster information
+I also extracted information about cell#-cluster relationships and have left notes in a separate txt document. In short, we're able to see how many cells are in each cluster, how many cells are in each replicate, what proportion of cells are in each cluster, and how cluster membership varies by replicate. I also extracted this information after going through the hierarchical clustering steps and reassigning numbers based on the dendogram to see if there are any differences. [H3: I want to figure out how to plot these numbers on the cells or see if there is an easier way to visualize this data alongside the clusters.]
+```{r linewidth=60}
+table(Idents(allTRY))
+table(allTRY$orig.ident)
+prop.table(table(Idents(allTRY)))
+table(Idents(allTRY), allTRY$orig.ident)
+```
+## Build a hierarchical tree
+I then followed the pipeline for building a hierarchical tree and created a new Seurat object "allTRY.tree". I generated a UMAP based on the tree and extracted the cell#-cluster relationship information from this UMAP as well. 
+```{r linewidth=60}
+allTRY.tree <- BuildClusterTree(allTRY, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = 1:30)
+PlotClusterTree(allTRY.tree, label = TRUE)
+```
+
+```{r linewidth=60}
+allTRY.tree <- RunUMAP(allTRY.tree, dims = 1:30)
+DimPlot(allTRY.tree, reduction = "umap", label = TRUE)
+table(Idents(allTRY.tree)) 
+table(allTRY.tree$orig.ident) 
+prop.table(table(Idents(allTRY.tree))) 
+table(Idents(allTRY.tree), allTRY.tree$orig.ident) 
+```
+
+## Plot features
+I then selected a list of genes to use as verification of how well the different parameters (i.e standard norm, straight merge vs CCA merge) are working. I initially chose 7 genes from our in situ list (Syt1, VACht, ChAT, Vglut1, FMRF-related peptide, FMRFamide, and TyrBH). I was going to use Gabby's for loop to read in a csv file and plot all of these features in a Featureplot, Vlnplot, and Dotplot. I ran into issues when trying to do this, so instead I opted to just list out the features. I encountered more issues at this step because I was not able to plot the features based on gene name (i.e. synaptotagmin-1), gene ID (Syt1), Ocbim # (Ocbimv22021175mg or gene:Ocbimv22021175m.g). I searched both the allTRY and allTRY.tree Seurat objects for these genes and was not finding anything. I looked specifically in the "var.genes" column. Then, I decided to look at all of the genes in the var.genes and see if I can pick one gene from there to plot. This troubleshooting would allow me to identify if my code is not working due to syntax-related problems or if it was not plotting because the genes I was looking for are not stored in the object. I found an immunoglobulin type of gene and tried plotting that and the line of code worked. I decided to save the vargenes file as a csv so I can search through and generate a list of genes that would provide helpful information about whether or not the parameters are aiding in cluster segregation. However, instead of trying to determine all of the genes in the csv file, I searched for the original candidate genes based on Ocbim #. I was not able to find Syt1 or Vglut1 but I identified the remaining 5. [H4: I need to figure out why I was unable to find the other genes and why the naming schemes are different]
+
+I created a variable to hold the names of these 5 candidate genes and called this variable "testfeatures". Then I plotted these features using Featureplot, Vlnplot, and Dotplot. [H5: I want to also figure out how to shorten these names so that we can see everything on the plots.]
+```{r linewidth=60}
+testfeatures <- c("Major-Facilitator-Superfamily-solute-carrier-family-18-vesic-Ocbimv22001681m", "Choline/Carnitine-o-acyltransferase-Ocbimv22001674m", "FMRFamide-related-peptide-family-FMRFamide-related-peptide-f-Ocbimv22023842m", "gene:Ocbimv22001324m.g", "DOMON-domain-Copper-type-II-ascorbate-dependent-monooxygenas-Ocbimv22031264m")
+ 
+FeaturePlot(allTRY.tree, features = testfeatures, ncol = 1)
+VlnPlot(allTRY.tree, features = testfeatures, ncol = 1)
+DotPlot(allTRY.tree, features = testfeatures) + RotatedAxis()
+```
+
+### Code for alternative way of plotting features:
+Read in csv file of test features. Create Seurat object "all.genes" to hold all gene IDS of allTRY.tree. Use loop and grep to find test features in all.genes. Plot all test features.
+````{r, eval = FALSE, echo = FALSE}
+yfg <- read.csv("/Users/josongco/Desktop/SeqData/testfeatures.csv",stringsAsFactors=FALSE)  # this file should be in gdrive
+
+all.genes <- rownames(allTRY.tree)
+
+genelist <- vector()
+nomatch <- list()
+for (i in 1:13){
+  gene <- yfg[[i,2]]
+  #gene<-substr(gene,7,str_length(gene)-1)
+  loc <- grep(gene,all.genes)
+  if (length(loc)>0) {
+    genelist <- c(genelist,loc)
+  } else {
+    nomatch <- c(nomatch,yfg[[i,2]])
+  }
+}
+
+DotPlot(allTRY.tree,features=rev(all.genes[genelist[1:13]])) + RotatedAxis()
+
+FeaturePlot(allTRY.tree,features = all.genes[genelist[1:4]]) + NoLegend() + NoAxes()
+FeaturePlot(allTRY.tree,features = all.genes[genelist[5:8]]) + NoLegend() + NoAxes()
+FeaturePlot(allTRY.tree,features = all.genes[genelist[9:13]]) + NoLegend() + NoAxes()
+
+VlnPlot(allTRY.tree,features = all.genes[genelist[1:4]]) + NoLegend() + NoAxes()
+VlnPlot(allTRY.tree,features = all.genes[genelist[5:8]]) + NoLegend() + NoAxes()
+VlnPlot(allTRY.tree,features = all.genes[genelist[9:13]]) + NoLegend() + NoAxes()
+
+# Can also use line of code below to find candidate gene 
+FeaturePlot(allTRY.tree,features = all.genes[grep("VGlut",all.genes)])

@@ -1,0 +1,102 @@
+---
+title: "draft norm after merge"
+author: "jos"
+date: "4/23/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+Merge and then normalize (source: https://davetang.org/muse/2018/01/24/merging-two-10x-single-cell-datasets/)
+```{r}
+
+
+alln1 <- NormalizeData(all_list[[1]])
+alln2 <- NormalizeData(all_list[[2]])
+alln3 <- NormalizeData(all_list[[3]])
+
+all <- merge(x = alln1, y = c(alln2, alln3), add.cell.ids = c("Run1", "Run2", "Run3"), project = "Norm_merge_postev")
+
+mito.genes <- grep(pattern = "^mitochondria-", x = rownames(x = allTRY), value = TRUE)
+percent.mito <- Matrix::colSums(allTRY) / Matrix::colSums(allTRY)
+allTRY[["percent.mt"]] <- PercentageFeatureSet(allTRY, pattern = "^mitochondria-")
+
+VlnPlot(allTRY, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+plot1 <- FeatureScatter(allTRY, feature1 = "nCount_RNA", feature2 = "percent.mt") # visualize the relationship between UMI counts and mitochondrial genes (percent)
+plot2 <- FeatureScatter(allTRY, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") # visualize the relationship between genes (ID as > 1 UMI count) and mitochondrial genes (percent)
+plot1 + plot2
+
+allTRY <- FindVariableFeatures(allTRY, selection.method = "vst", nfeatures = 2000)
+top10 <- head(VariableFeatures(allTRY), 10) # ID 10 most highly variable genes
+plot1 <- VariableFeaturePlot(allTRY)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+
+allTRY <- ScaleData(allTRY, vars.to.regress = "percent.mt") # unable to regress out nCount_RNA, which causes the ScaleData to not properly store information which is necessary for RunPCA function
+allTRY <- RunPCA(allTRY, npcs = 30, verbose = FALSE) 
+allTRY <- FindNeighbors(allTRY, dims = 1:30)
+allTRY <- FindClusters(allTRY, reduction.type = "pca", dims = 1:30, resolution = 1)
+allTRY <- RunUMAP(allTRY, reduction = "pca", dims = 1:30) # figure out if findneighbors and findclusters is necessary before RunUMAP steps (seems like as long as you run FindNeighbors and FindClusters before DimPlot- source: https://github.com/satijalab/seurat/issues/2152)
+
+DimPlot(allTRY, reduction = "umap", label = TRUE)
+DimPlot(allTRY, reduction = "umap", group.by = "orig.ident")
+table(Idents(allTRY)) # how many cells are in each cluster
+table(allTRY$orig.ident) # how many cells are in each replicate
+prop.table(table(Idents(allTRY))) # what proportion of cells are in each cluster
+table(Idents(allTRY), allTRY$orig.ident) # how does cluster membership vary by replicate
+
+allTRY.tree <- BuildClusterTree(allTRY, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = 1:30)
+PlotClusterTree(allTRY.tree, reduction = "umap", label = TRUE)
+
+allTRY.tree <- RunUMAP(allTRY.tree, dims = 1:30)
+DimPlot(allTRY.tree, reduction = "umap", label = TRUE)
+table(Idents(allTRY.tree)) # how many cells are in each cluster
+table(allTRY.tree$orig.ident) # how many cells are in each replicate
+prop.table(table(Idents(allTRY.tree))) # what proportion of cells are in each cluster
+table(Idents(allTRY.tree), allTRY.tree$orig.ident) # how does cluster membership vary by replicate
+
+GenesIDV <- read.csv("/Users/josongco/Desktop/SeqData/GeneIDs_verif.csv", header=TRUE, sep = ",")
+str(GenesIDV)
+
+GenesIDV$Gene <- lapply(GenesIDV$Gene, gsub, pattern=' ', replacement='-')
+#Remove any / in the names
+GenesIDV <- lapply(GenesIDV, gsub, pattern='/', replacement='-')
+
+setwd("/Users/josongco/Desktop/SeqData/Genes/allMerge")
+
+FeaturePlot(allTRY.tree, features = TyrBH, sort.cell = TRUE, pt.size = 1.5)
+
+FeaturePlot(allTRY.tree, features = testfeatures)
+ 
+testfeatures <- c("Major-Facilitator-Superfamily-solute-carrier-family-18-vesic-Ocbimv22001681m", "Choline/Carnitine-o-acyltransferase-Ocbimv22001674m", "FMRFamide-related-peptide-family-FMRFamide-related-peptide-f-Ocbimv22023842m", "gene:Ocbimv22001324m.g", "DOMON-domain-Copper-type-II-ascorbate-dependent-monooxygenas-Ocbimv22031264m")
+ 
+ FeaturePlot(allTRY.tree, features = testfeatures)
+ VlnPlot(allTRY.tree, features = testfeatures)
+ DotPlot(allTRY.tree, features = testfeatures)
+
+saveRDS(alln1, file = "/Users/josongco/Desktop/SeqData/alln1_stdmerge.rds")
+saveRDS(alln2, file = "/Users/josongco/Desktop/SeqData/alln2_stdmerge.rds")
+saveRDS(alln3, file = "/Users/josongco/Desktop/SeqData/alln3_stdmerge.rds")

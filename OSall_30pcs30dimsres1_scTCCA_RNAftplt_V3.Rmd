@@ -1,0 +1,142 @@
+---
+title: "CCA integration of v3 chemistry datasets (scTransform Normalization)"
+author: "jos"
+date: "05/12/2020"
+output:
+  html_document:
+    fig_height: 12
+    fig_width: 17
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Objective: use a for loop to read in and process v3 data sets from the original GTF and conduct CCA integration with scTransform normalization.
+```{r, echo = FALSE}
+# to knit document, use the following command: rmarkdown::render("/Users/josongco/Documents/GitHub/Octopolis/OSall_30pcs30dimsres1_scTCCA_RNAftplt_V3.Rmd") ~30m
+
+library(Seurat)
+library(Matrix)
+library(ggplot2)
+library(sctransform)
+library(stringr)
+library(cowplot) # used for CCA
+library(patchwork) # used for CCA
+```
+
+## Read in data
+```{r, echo = FALSE, eval = FALSE}
+# Using the OctoSeqPipeline Code, I used a for loop to read in v3 datasets from the original GTF. I set parameters to include a min.cell = 3 and min.features = 200. Pull information re: percent.mt. Then I used a for loop for scTransform normalization on individual data sets in all_list. Then we'll integrate the datasets into one based on anchors with 30 dims. In order to run FindIntegrationAnchors, needed to index [2:3] to omit NULL Run 1.
+
+all_list <- readRDS("/Users/josongco/all_listv3.rds")
+for (i in 2:length(all_list)){
+  all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command
+  all_list[[i]] <- SCTransform(all_list[[i]], verbose = FALSE)
+}
+
+## Select features for downstream integration, and run PrepSCTIntegration so that all necessary Pearson residuals have been calculated
+all.features <- SelectIntegrationFeatures(object.list = all_list[2:3], nfeatures = 2000) #paper uses 3000 as default but chose to use 2000 like other dataset integration
+all_list <- PrepSCTIntegration(object.list = all_list[2:3], anchor.features = all.features, verbose = TRUE)
+
+## Identify anchors and integrate datasets. Use the standard workflow, with the exception that normalization.method = 'SCT'
+all.anchors <- FindIntegrationAnchors(object.list = all_list, normalization.method = "SCT", 
+    anchor.features = all.features, verbose = TRUE)
+all.anchors <- FindIntegrationAnchors(object.list = all_list, normalization.method = "SCT", 
+    anchor.features = all.features, dims = 1:30, verbose = TRUE) # can omit dims but takes a really long time to run
+allnorm.integrated <- IntegrateData(anchorset = all.anchors, normalization.method = "SCT", 
+    verbose = TRUE)
+
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/SeqData/allscTCCAV3.rds")
+```
+
+## Read in integrated dataset
+I performed normalization on the individual datasets before conducting a merge using CCA. I applied scTransform normalization on individual datasets before integrating based on anchors. I then saved this Seurat object so that I can easily read in the rds file when knitting the html.
+```{r, echo = FALSE}
+all <- readRDS("/Users/josongco/Desktop/SeqData/allscTCCAV3.rds")
+```
+
+## Plot features of the object. 
+Visualization of object features: plot nFeature, nCount, and percent.mt for each of the Runs in the merged object. (Note: nFeature = # genes, nCount = UMI counts, and percent.mt is important because higher levels of percent.mt are indicative of cell stress.) Typically, I would subset the data to only include nFeatures >200, <2500, and percent.mt <5. However, even though I used visualization techniques to plot these features, I did not end up subsetting the data.
+```{r }
+VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+plot1 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "percent.mt")
+# visualize the relationship between UMI counts and mitochondrial genes (percent)
+plot2 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") 
+# visualize the relationship between genes (ID as >1 UMI) and mitochondrial genes
+plot1 + plot2
+```
+
+## Run PCA and generate UMAP
+I performed PCA and all downstream analyses on 30 pcs, 30 dims, and a resolution of 1. I then plotted the UMAP based on this original analysis and then again with the Runs mapped on top of the clusters. We're able to see that a straight merge does not integrate the data as well as CCA does. 
+```{r }
+all <- RunPCA(all, npcs = 30, verbose = FALSE) 
+all <- FindNeighbors(all, reduction = "pca", dims = 1:30) #not sure if "reduction" argument is necessary
+all <- FindClusters(all, resolution = 1)
+all <- RunUMAP(all, reduction = "pca", dims = 1:30)
+DimPlot(all, reduction = "umap", label = TRUE)
+DimPlot(all, reduction = "umap", group.by = "orig.ident")
+```
+
+## Examine cell-cluster information
+We're able to see how many cells are in each cluster, how many cells are in each replicate, what proportion of cells are in each cluster, and how cluster membership varies by replicate. I also extracted this information after going through the hierarchical clustering steps and reassigning numbers based on the dendogram to see if there are any differences.
+```{r }
+table(Idents(all))
+table(all$orig.ident)
+prop.table(table(Idents(all)))
+table(Idents(all), all$orig.ident)
+```
+
+## Build a hierarchical tree
+I then followed the pipeline for building a hierarchical tree and created a new Seurat object "all.tree". I generated a UMAP based on the tree and extracted the cell#-cluster relationship information from this UMAP as well. 
+```{r }
+all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = 1:30)
+PlotClusterTree(all.tree, label = TRUE)
+```
+
+```{r }
+all.tree <- RunUMAP(all.tree, dims = 1:30)
+DimPlot(all.tree, reduction = "umap", label = TRUE)
+table(Idents(all.tree)) 
+table(all.tree$orig.ident) 
+prop.table(table(Idents(all.tree))) 
+table(Idents(all.tree), all.tree$orig.ident) 
+```
+
+## Plot features
+I then selected a list of genes (in situ) to use as verification of how well the different parameters (i.e standard norm, straight merge vs CCA merge) are working. Since the gene IDs were read in with the RNA assay and not incorporated in the integrated assay, we are going to switch to the RNA assay for mapping on features for comparison. In a testrun, I was able to verify that switching to the RNA assay did not replace the current umap. (Will want to further validate the effects of switching back to the RNA assay)
+````{r, echo = FALSE}
+yfg <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
+
+# all.genes <- rownames(all) # same as rownames(all.tree)
+all.genes <- rownames(all@assays$RNA) 
+
+genelist <- vector()
+nomatch <- list()
+for (i in 1:12){
+  gene <- yfg[[i,2]]
+  #gene<-substr(gene,7,str_length(gene)-1)
+  loc <- grep(gene,all.genes)
+  if (length(loc)>0) {
+    genelist <- c(genelist,loc)
+  } else {
+    nomatch <- c(nomatch,yfg[[i,2]])
+  }
+}
+
+DefaultAssay(all.tree) <- "RNA"
+
+DotPlot(all.tree,features=rev(all.genes[genelist[1:12]])) + RotatedAxis()
+
+FeaturePlot(all.tree,features = all.genes[genelist[1:2]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(all.tree,features = all.genes[genelist[3:4]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(all.tree,features = all.genes[genelist[5:6]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(all.tree,features = all.genes[genelist[7:8]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(all.tree,features = all.genes[genelist[9:10]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(all.tree,features = all.genes[genelist[11:12]], ncol = 1) + NoLegend() + NoAxes()
+
+VlnPlot(all.tree,features = all.genes[genelist[1:4]], ncol = 1) + NoLegend() + NoAxes()
+VlnPlot(all.tree,features = all.genes[genelist[5:8]], ncol = 1) + NoLegend() + NoAxes()
+VlnPlot(all.tree,features = all.genes[genelist[9:12]], ncol = 1) + NoLegend() + NoAxes()
+
+# Can also use line of code below to find candidate gene 
+#FeaturePlot(all.tree,features = all.genes[grep("VGlut",all.genes)])
