@@ -1,3 +1,8 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
 # VPNconnect: vpn.uoregon.edu, login ID
 
 ## Mount to Talapas to access raw data (via Terminal Window)
