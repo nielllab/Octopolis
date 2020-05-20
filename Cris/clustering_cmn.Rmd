@@ -14,6 +14,7 @@ output:
 ## Set your working directory path
 ```{r}
 #setwd("/Users/deniseniell/Desktop/Seurat/run2")
+rm(list = ls())
 ```
 
 # Load libraries 
