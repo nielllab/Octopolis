@@ -1,7 +1,7 @@
 ---
 title: "CCA integration of all three datasets with HiSat GTF"
 author: "jos"
-date: "05/18/2020"
+date: "05/23/2020"
 output:
   html_document:
     fig_height: 12
@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 # Objective: use a for loop to read in and process all 3 data sets from the original GTF and conduct a straight merge with standard normalization.
 ```{r, echo = FALSE}
-# to knit document, use the following command: rmarkdown::render("/Users/josongco/Documents/GitHub/Octopolis/OSall_30pcs30dimsres1_normCCA_HiSat.Rmd") ~30m
+# to knit document, use the following command: rmarkdown::render("C:/Users/Hannah Bishop/Desktop/GitHubCode/Octopolis/OSall_30pcs30dimsres1_normCCA_HiSat.Rmd") ~30m
 
 library(Seurat)
 library(Matrix)
@@ -25,30 +25,24 @@ library(patchwork) # used for CCA
 ```
 
 ## Read in data
-Using the OctoSeqPipeline Code, I used a for loop to read in all three datasets from the original GTF. I set parameters to include a min.cell = 3 and min.features = 200. Pull information re: percent.mt. Then I used a for loop to normalize and scale data and perform FindVariableFeatures on individual objects in all_list. Then we'll integrate the datasets into one based on anchors with 30 dims.
 ```{r , echo = FALSE, eval = FALSE}
-all_list <- readRDS("~/hisatAll_list.rds")
-for (i in 4:length(all_list)){
+all_list <- readRDS("C:/Users/Hannah Bishop/Desktop/MeaS/hisatAll_list.rds")
+for (i in 1:length(all_list)){
   all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command, leave out for new GTF because poor annotation
-}
   all_list[[i]] <- NormalizeData(all_list[[i]])
-  all_list[[i]] <- ScaleData(all_list[[i]], vars.to.regress = "percent.mt") # ~30m, ~50m, ~40m # cannot regress out percent.mt
-  all_list[[i]] <- FindVariableFeatures(all_list[[i]], selection.method = "vst", nfeatures = 2000)
+   all_list[[i]] <- FindVariableFeatures(all_list[[i]], selection.method = "vst", nfeatures = 2000)
+}
 
-saveRDS(all_list, "/Users/josongco/Desktop/SeqData/allnormCCA_Hisat_notinteg.rds")
-all_list <- readRDS("/Users/josongco/Desktop/SeqData/allnormCCA_Hisat_notinteg.rds")
-
-allnorm.anchors <- FindIntegrationAnchors(all_list[4:6], dims = 1:30) # runs CCA ~30m; shows 0% but moves on to merging objects etc; found 43006 anchors -> 10257 [what is the ideal/typical number for anchors across three datasets?]; overall takes ~2-3hr
+allnorm.anchors <- FindIntegrationAnchors(all_list[2:3], dims = 1:30) # runs CCA ~30m; shows 0% but moves on to merging objects etc; found 43006 anchors -> 10257 [what is the ideal/typical number for anchors across three datasets?]; overall takes ~2-3hr
 allnorm.integrated <- IntegrateData(anchorset = allnorm.anchors, dims = 1:30)
 
-saveRDS(allnorm.integrated, "/Users/josongco/Desktop/SeqData/allnormCCA_Hisat.rds")
-integrated <- readRDS("/Users/josongco/Desktop/SeqData/allnormCCA_Hisat.rds")
+saveRDS(allnorm.integrated, "C:/Users/Hannah Bishop/Desktop/MeaS/Seurat/Hisat/v3normCCA_Hisat.rds")
 ```
 
 ## Read in integrated dataset
 I performed normalization on the individual datasets before conducting a merge using CCA. I applied normalization, scaledata, and findvariablefeatures on individual datasets before integrating based on anchors. I then saved this Seurat object so that I can easily read in the rds file when knitting the html.
 ```{r, echo = FALSE}
-all <- readRDS("/Users/josongco/Desktop/SeqData/allnormCCA_Hisat.rds")
+all <- readRDS("C:/Users/Hannah Bishop/Desktop/MeaS/Seurat/Hisat/v3normCCA_Hisat.rds")
 DefaultAssay(all) <- "integrated"
 ```
 
@@ -64,10 +58,8 @@ plot1 + plot2
 ```
 
 ## Run PCA and generate UMAP
-I performed PCA and all downstream analyses on 30 pcs, 30 dims, and a resolution of 1. I then plotted the UMAP based on this original analysis and then again with the Runs mapped on top of the clusters. We're able to see that a straight merge does not integrate the data as well as CCA does. 
 ```{r }
-all <- ScaleData(all, vars.to.regress = "percent.mt") # although individual datasets were scaled, integrated dataset is not scaled
-# unable to regress out nCount_RNA, which causes the ScaleData to not properly store information which is necessary for RunPCA function
+all <- ScaleData(all)
 all <- RunPCA(all, npcs = 30, verbose = FALSE) 
 all <- FindNeighbors(all, reduction = "pca", dims = 1:30) #not sure if "reduction" argument is necessary
 all <- FindClusters(all, resolution = 1)
@@ -77,7 +69,6 @@ DimPlot(all, reduction = "umap", group.by = "orig.ident")
 ```
 
 ## Examine cell-cluster information
-We're able to see how many cells are in each cluster, how many cells are in each replicate, what proportion of cells are in each cluster, and how cluster membership varies by replicate. I also extracted this information after going through the hierarchical clustering steps and reassigning numbers based on the dendogram to see if there are any differences.
 ```{r }
 table(Idents(all))
 table(all$orig.ident)
@@ -85,7 +76,6 @@ prop.table(table(Idents(all)))
 table(Idents(all), all$orig.ident)
 ```
 ## Build a hierarchical tree
-I then followed the pipeline for building a hierarchical tree and created a new Seurat object "all.tree". I generated a UMAP based on the tree and extracted the cell#-cluster relationship information from this UMAP as well. 
 ```{r }
 all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = 1:30)
 PlotClusterTree(all.tree, label = TRUE)
@@ -101,9 +91,8 @@ table(Idents(all.tree), all.tree$orig.ident)
 ```
 
 ## Plot features
-I then selected a list of genes (in situ) to use as verification of how well the different parameters (i.e standard norm, straight merge vs CCA merge) are working. Since the gene IDs were read in with the RNA assay and not incorporated in the integrated assay, we are going to switch to the RNA assay for mapping on features for comparison. In a testrun, I was able to verify that switching to the RNA assay did not replace the current umap. (Will want to further validate the effects of switching back to the RNA assay)
 ````{r, echo = FALSE}
-yfg <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
+yfg <- read.csv("C:/Users/Hannah Bishop/Desktop/MeaS/Genes for in situ.csv",stringsAsFactors=FALSE)
 
 # all.genes <- rownames(all) # same as rownames(all.tree)
 all.genes <- rownames(all@assays$RNA) 
