@@ -1,7 +1,7 @@
 ---
-title: "CCA integration of all datasets with HiSat GTF"
+title: "CCA integration of v3 datasets with HiSat GTF"
 author: "jos"
-date: "05/29/2020"
+date: "05/28/2020"
 output:
   html_document:
     fig_height: 12
@@ -33,16 +33,16 @@ for (i in 1:length(all_list)){
   all_list[[i]] <- FindVariableFeatures(all_list[[i]], selection.method = "vst", nfeatures = 2000)
 }
 
-allnorm.anchors <- FindIntegrationAnchors(all_list, dims = 1:30) # runs CCA ~30m; shows 0% but moves on to merging objects etc; found 43006 anchors -> 10257 [what is the ideal/typical number for anchors across three datasets?]; overall takes ~2-3hr
+allnorm.anchors <- FindIntegrationAnchors(all_list[2:3], dims = 1:30) # runs CCA ~30m; shows 0% but moves on to merging objects etc; found 43006 anchors -> 10257 [what is the ideal/typical number for anchors across three datasets?]; overall takes ~2-3hr
 allnorm.integrated <- IntegrateData(anchorset = allnorm.anchors, dims = 1:30)
 
-saveRDS(allnorm.integrated, "C:/Users/Hannah Bishop/Desktop/MeaS/Seurat/Hisat/normCCA_Hisat.rds")
+saveRDS(allnorm.integrated, "C:/Users/Hannah Bishop/Desktop/MeaS/Seurat/Hisat/v3normCCA_Hisat.rds")
 ```
 
 ## Read in integrated dataset
 I performed normalization on the individual datasets before conducting a merge using CCA. I applied normalization, scaledata, and findvariablefeatures on individual datasets before integrating based on anchors. I then saved this Seurat object so that I can easily read in the rds file when knitting the html.
 ```{r, echo = FALSE}
-all <- readRDS("C:/Users/Hannah Bishop/Desktop/MeaS/Seurat/Hisat/normCCA_Hisat.rds")
+all <- readRDS("C:/Users/Hannah Bishop/Desktop/MeaS/Seurat/Hisat/v3normCCA_Hisat.rds")
 DefaultAssay(all) <- "integrated"
 ```
 

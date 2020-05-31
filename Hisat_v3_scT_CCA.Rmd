@@ -1,7 +1,7 @@
 ---
-title: "CCA integration of all datasets with HiSat GTF"
+title: "CCA integration of v3 datasets with HiSat GTF and scT norm"
 author: "jos"
-date: "05/29/2020"
+date: "05/30/2020"
 output:
   html_document:
     fig_height: 12
@@ -11,9 +11,9 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-# Objective: use a for loop to read in and process all 3 data sets from the original GTF and conduct a straight merge with standard normalization.
+# Objective: use a for loop to read in and process v3 data sets from the Hisat GTF and conduc CCA merge with scT normalization.
 ```{r, echo = FALSE}
-# to knit document, use the following command: rmarkdown::render("C:/Users/Hannah Bishop/Desktop/GitHubCode/Octopolis/OSall_30pcs30dimsres1_normCCA_HiSat.Rmd") ~30m
+# to knit document, use the following command: rmarkdown::render("C:/Users/Hannah Bishop/Desktop/GitHubCode/Octopolis/Hisat_v3_scT_CCA.Rmd") ~30m
 
 library(Seurat)
 library(Matrix)
@@ -26,28 +26,34 @@ library(patchwork) # used for CCA
 
 ## Read in data
 ```{r , echo = FALSE, eval = FALSE}
-all_list <- readRDS("C:/Users/Hannah Bishop/Desktop/MeaS/hisatAll_list.rds")
-for (i in 1:length(all_list)){
-  #all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command, leave out for new GTF because poor annotation
-  all_list[[i]] <- NormalizeData(all_list[[i]])
-  all_list[[i]] <- FindVariableFeatures(all_list[[i]], selection.method = "vst", nfeatures = 2000)
-}
+setwd("C:/Users/Hannah Bishop/Desktop/MeaS/Seurat/Hisat")
 
-allnorm.anchors <- FindIntegrationAnchors(all_list, dims = 1:30) # runs CCA ~30m; shows 0% but moves on to merging objects etc; found 43006 anchors -> 10257 [what is the ideal/typical number for anchors across three datasets?]; overall takes ~2-3hr
-allnorm.integrated <- IntegrateData(anchorset = allnorm.anchors, dims = 1:30)
+#all_list <- readRDS("C:/Users/Hannah Bishop/Desktop/MeaS/hisatAll_list.rds")
+#for (i in 2:length(all_list)){
+#  all_list[[i]] <- SCTransform(all_list[[i]], verbose = FALSE)
+#}
 
-saveRDS(allnorm.integrated, "C:/Users/Hannah Bishop/Desktop/MeaS/Seurat/Hisat/normCCA_Hisat.rds")
+#saveRDS(all_list, "C:/Users/Hannah Bishop/Desktop/MeaS/hisatAll_listSCT.rds")
+
+all_list <- readRDS("C:/Users/Hannah Bishop/Desktop/MeaS/hisatAll_listSCT.rds")
+
+#all.features <- SelectIntegrationFeatures(object.list = all_list[2:3], nfeatures = 2000) #paper uses 3000 as default but chose to use 2000 like other dataset integration
+#all_list <- PrepSCTIntegration(object.list = all_list[2:3], anchor.features = all.features, verbose = TRUE)
+
+allnorm.anchors <- FindIntegrationAnchors(all_list[2:3], anchor.features = 2000, dims = 1:30) # runs CCA ~30m; shows 0% but moves on to merging objects etc; found 43006 anchors -> 10257 [what is the ideal/typical number for anchors across three datasets?]; overall takes ~2-3hr
+allnorm.integrated <- IntegrateData(anchorset = allnorm.anchors, dims = 1:30, 
+    verbose = TRUE)
+
+saveRDS(allnorm.integrated, "C:/Users/Hannah Bishop/Desktop/MeaS/Seurat/Hisat/scTCCA_Hisatv3.rds")
 ```
 
 ## Read in integrated dataset
-I performed normalization on the individual datasets before conducting a merge using CCA. I applied normalization, scaledata, and findvariablefeatures on individual datasets before integrating based on anchors. I then saved this Seurat object so that I can easily read in the rds file when knitting the html.
 ```{r, echo = FALSE}
-all <- readRDS("C:/Users/Hannah Bishop/Desktop/MeaS/Seurat/Hisat/normCCA_Hisat.rds")
+all <- readRDS("C:/Users/Hannah Bishop/Desktop/MeaS/Seurat/Hisat/scTCCA_Hisatv3.rds")
 DefaultAssay(all) <- "integrated"
 ```
 
 ## Plot features of the object. 
-Visualization of object features: plot nFeature, nCount, and percent.mt for each of the Runs in the merged object. (Note: nFeature = # genes, nCount = UMI counts, and percent.mt is important because higher levels of percent.mt are indicative of cell stress.) Typically, I would subset the data to only include nFeatures >200, <2500, and percent.mt <5. However, even though I used visualization techniques to plot these features, I did not end up subsetting the data.
 ```{r }
 VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
 #plot1 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "percent.mt")
