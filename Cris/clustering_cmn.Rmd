@@ -1,3 +1,8 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
 # VPNconnect: vpn.uoregon.edu, login ID
 
 ## Mount to Talapas to access raw data (via Terminal Window)
@@ -9,6 +14,7 @@
 ## Set your working directory path
 ```{r}
 #setwd("/Users/deniseniell/Desktop/Seurat/run2")
+rm(list = ls())
 ```
 
 # Load libraries 
@@ -60,7 +66,7 @@ for (g in 1:ngenes){
 #Change the project name here so that you can keep track of your data
 
 all <- CreateSeuratObject(counts = all, project = "OctoSeq2_names", min.cells = 3, min.features = 200)
-all
+
 ```
 
 # Begin Quality Control Steps
@@ -68,7 +74,7 @@ all
 mito.genes <- grep(pattern = "^mt-", x = rownames(x = all), value = TRUE)
 percent.mito <- Matrix::colSums(all) / Matrix::colSums(all)
 all[["percent.mt"]] <- PercentageFeatureSet(all, pattern = "^MT-")
-all <- subset(all, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
+all <- subset(all, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5 & nCount_RNA>1000)
 plot1 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "percent.mt")
 plot2 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
 CombinePlots(plots = list(plot1, plot2))
@@ -77,6 +83,9 @@ CombinePlots(plots = list(plot1, plot2))
 ## Number of unique genes and total moleculares are automatically calculated during CreateSeuratObject, but you can view these metrics because they are stored in the object meta data
 ```{r}
 head(all@meta.data, 5)
+median(all@meta.data$nCount_RNA)
+median(all@meta.data$nFeature_RNA)
+length(all@meta.data$nCount_RNA)
 ```
 ## You can also visualize these QC metrics and use this to decide how to filter cells
 ```{r}
@@ -113,7 +122,7 @@ all <- ScaleData(all, features = all.genes)
 # Perform linear dimensional reduction (PCA) ~15-20m
 I normally will create a new variable/Seurat object at this point and rename it as "all.norm" so that I know that I have all of the preprocesed data prior to running PCA, and I can manipulate the PCs etc moving forward but still be able to go back to the processed data easily
 ```{r}
-all.norm <- RunPCA(all, features = VariableFeatures(object = all), npcs = 200)
+all.norm <- RunPCA(all, features = VariableFeatures(object = all), npcs = 100)
 ```
 # save data at this point just in case RStudio crashes!
 ```{r}
@@ -125,7 +134,6 @@ You can skip the next few lines of code (visualization of PCs, elbow and jackstr
 ```{r}
 DimHeatmap(all.norm, dims = 1, cells = 500, balanced = TRUE)
 DimHeatmap(all.norm, dims = 1:10, cells = 500, balanced = TRUE)
-DimHeatmap(all.norm, dims = c(90:100, 197:200), cells = 500, balanced = TRUE)
 VizDimLoadings(all.norm, dims = 1:2, reduction = "pca")
 DimPlot(all.norm, reduction = "pca")
 ```
@@ -158,8 +166,8 @@ ElbowPlot(all.norm, ndims = 200)
 
 ##Note: even if you only run 20 dims with the JackStraw function above, looks like you can still proceed with >20 dims in the following commands ~5m
 ```{r}
-all.norm <- FindNeighbors(all.norm, dims = 1:50) # changed this from 200, to be consistent with FindClusters next
-all.norm <- FindClusters(all.norm, reduction.type = "pca", dims = 1:50, resolution = 1)
+all.norm <- FindNeighbors(all.norm, dims = 1:20) # changed this from 200, to be consistent with FindClusters next
+all.norm <- FindClusters(all.norm, reduction.type = "pca", dims = 1:20, resolution = 1)
 ##Notes: 200dims, res 1 yields 18 singletons and 15 final clusters; 200dims, res 0.5 yields 18 singletons and 12 final clusters; 200dims, res 1.5 yields 29 singletons and 68 final clusters; 200dims, res 0.2 yields 18 singletons and 9 final clusters; 150dims, res 1 yields 18 singletons and 15 final clusters; 100dims, res 1 yields 18 singletons and 15 final clusters; 50dims, res 1 yields 18 singletons and 15 final clusters; 50dims, res 0.5 yields 18 singletons and 12 clusters. --> let's stick with 50dims at res 1 for now and revisit FindNeighbors parameters to address singleton issue
 ##Notes: Neighbors = 200 dims, Clusters = 50dims, at res 0.05 there are 18 singletons and 9 final clusters; Neighbors = 200, Clusters = 50dims, at res 0.01 there are 18 singletons and 6 final clusters
 
@@ -173,7 +181,7 @@ head(Idents(all.norm), 5)
 
 ## Non-linear dimensional reduction techniques, such as tSNE and UMAP, allows one to visualize and explore the datasets. The goal of these algorithms is to learn the underlying manifold of the data in order to place similar cells together in a low-dimensional space. Cells within the graph-based clusters determined above should co-localize on these dimension reduction plots. Seurat suggests using the same PCs as what was provided as input to the clustering analysis.
 ```{r}
-all.norm <- RunUMAP(all.norm, dims = 1:50) # was 1:20 dims
+all.norm <- RunUMAP(all.norm, dims = 1:20) # was 1:20 dims
 DimPlot(all.norm, reduction = "umap", label = TRUE)
 ```
 # Run non-linear dimensional reduction with tSNE (UMAP preferred, so this section is edited/commented out)
@@ -190,7 +198,7 @@ TSNEPlot(object = OS1.15, do.label = TRUE)
 # Assigned cluster will be placed in the 'tree.ident' field of nbt@data.info, and also stored in nbt@ident
 
 ```{r}
-all.normTREE <- BuildClusterTree(all.norm, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims=1:50)
+all.normTREE <- BuildClusterTree(all.norm, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims=1:20)
 PlotClusterTree(all.normTREE)
 ```
 
@@ -253,23 +261,23 @@ for (i in 1:nclust){
   these <-these[which(these$avg_logFC>0.5),]
   these <- these[order(these$avg_logFC, decreasing = TRUE),]
   
-   print(DoHeatmap(all.normTREE, features = head(these$gene,40)) + NoLegend() + theme(axis.text.y = element_text(size = 5)))
+   print(DoHeatmap(all.normTREE, features = head(these$gene,40)) + NoLegend() + theme(axis.text.y = element_text(size = 6)))
 
-   print(head(these,40))
+   #print(head(these,40))
 }
 ```
 ### get markers for pairwise discrimination
 ```{r}
-pair.markers <- FindMarkers(all.normTREE, ident.1 = 24, ident.2=25,min.pct = 0.5, logfc.threshold = 0.5)
+#pair.markers <- FindMarkers(all.normTREE, ident.1 = 24, ident.2=25,min.pct = 0.5, logfc.threshold = 0.5)
 
-   DoHeatmap(all.normTREE, features = rownames(pair.markers)) + NoLegend() + theme(axis.text.y = element_text(size = 8))
+#   DoHeatmap(all.normTREE, features = rownames(pair.markers)) + NoLegend() + theme(axis.text.y = element_text(size = 8))
 ```
 # get markers of groups
 ```{r}
 
-pair.markers <- FindMarkers(all.normTREE, ident.1 = c(15,16,17, 18, 19),min.pct = 0.5, logfc.threshold = 0.5)
+#pair.markers <- FindMarkers(all.normTREE, ident.1 = c(15,16,17, 18, 19),min.pct = 0.5, logfc.threshold = 0.5)
 
-   DoHeatmap(all.normTREE, features = rownames(pair.markers)) + NoLegend() + theme(axis.text.y = element_text(size = 8))
+#   DoHeatmap(all.normTREE, features = rownames(pair.markers)) + NoLegend() + theme(axis.text.y = element_text(size = 8))
 ```
 
 
@@ -342,8 +350,9 @@ for(i in 1:length(tree_markers)){
   these <-these[which(abs(these$avg_logFC)>0.5),]
   these <- these[order(these$avg_logFC, decreasing = TRUE),]
   these <- rbind(head(these,10),tail(these,10))
-print(these)
-   print(DoHeatmap(all.normTREE, features = rownames(these))+ NoLegend() + theme(axis.text.y = element_text(size = 5)))
+#print(these)
+
+print(DoHeatmap(all.normTREE, features = rownames(these))+ NoLegend() + theme(axis.text.y = element_text(size = 6)))
   
 }
 
@@ -436,6 +445,13 @@ DoHeatmap(all.normTREE, features = all.genes[genelist],disp.min = -1.5, disp.max
 
 ```{r}
 DotPlot(all.normTREE,features=rev(all.genes[genelist])) + RotatedAxis()
+
+for (i in 1:length(genelist)){
+  
+
+FeaturePlot(all.normTREE,features = all.genes[genelist[i]], ncol = 1) + NoLegend() + NoAxes()
+}
+
 ```
 ```{r}
 

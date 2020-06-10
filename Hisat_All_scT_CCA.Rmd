@@ -1,0 +1,141 @@
+---
+title: "CCA integration of v3 datasets with HiSat GTF and scT norm"
+author: "jos"
+date: "05/30/2020"
+output:
+  html_document:
+    fig_height: 12
+    fig_width: 17
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Objective: use a for loop to read in and process v3 data sets from the Hisat GTF and conduct CCA merge with scT normalization.
+```{r, echo = FALSE}
+# to knit document, use the following command: rmarkdown::render("C:/Users/Hannah Bishop/Desktop/GitHubCode/Octopolis/Hisat_All_scT_CCA.Rmd") ~30m
+
+library(Seurat)
+library(Matrix)
+library(ggplot2)
+library(sctransform)
+library(stringr)
+library(cowplot) # used for CCA
+library(patchwork) # used for CCA
+```
+
+## Read in data
+```{r , echo = FALSE, eval = FALSE}
+setwd("C:/Users/Hannah Bishop/Desktop/MeaS/Seurat/Hisat")
+
+all_list <- readRDS("C:/Users/Hannah Bishop/Desktop/MeaS/hisatAll_list.rds")
+for (i in 1:length(all_list)){
+  all_list[[i]] <- SCTransform(all_list[[i]], verbose = FALSE)
+}
+
+#all.features <- SelectIntegrationFeatures(object.list = all_list[2:3], nfeatures = 2000) #paper uses 3000 as default but chose to use 2000 like other dataset integration
+#all_list <- PrepSCTIntegration(object.list = all_list[2:3], anchor.features = all.features, verbose = TRUE)
+
+allnorm.anchors <- FindIntegrationAnchors(all_list, anchor.features = 2000, dims = 1:30) # runs CCA ~30m; shows 0% but moves on to merging objects etc; found 43006 anchors -> 10257 [what is the ideal/typical number for anchors across three datasets?]; overall takes ~2-3hr
+allnorm.integrated <- IntegrateData(anchorset = allnorm.anchors, dims = 1:30, 
+    verbose = TRUE)
+
+saveRDS(allnorm.integrated, "C:/Users/Hannah Bishop/Desktop/MeaS/Seurat/Hisat/scTCCA_Hisat.rds")
+```
+
+## Read in integrated dataset
+```{r, echo = FALSE}
+all <- readRDS("C:/Users/Hannah Bishop/Desktop/MeaS/Seurat/Hisat/scTCCA_Hisat.rds")
+DefaultAssay(all) <- "integrated"
+```
+
+## Plot features of the object. 
+```{r }
+VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
+#plot1 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "percent.mt")
+# visualize the relationship between UMI counts and mitochondrial genes (percent)
+plot2 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") 
+# visualize the relationship between genes (ID as >1 UMI) and mitochondrial genes
+#plot1 + plot2
+plot2
+```
+
+## Run PCA and generate UMAP
+```{r }
+all <- ScaleData(all)
+all <- RunPCA(all, npcs = 30, verbose = FALSE) 
+all <- FindNeighbors(all, reduction = "pca", dims = 1:30) #not sure if "reduction" argument is necessary
+all <- FindClusters(all, resolution = 1)
+all <- RunUMAP(all, reduction = "pca", dims = 1:30)
+DimPlot(all, reduction = "umap", label = TRUE)
+DimPlot(all, reduction = "umap", group.by = "orig.ident")
+```
+
+## Examine cell-cluster information
+```{r }
+table(Idents(all))
+table(all$orig.ident)
+prop.table(table(Idents(all)))
+table(Idents(all), all$orig.ident)
+```
+## Build a hierarchical tree
+```{r }
+all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = 1:30)
+PlotClusterTree(all.tree, label = TRUE)
+```
+
+```{r }
+all.tree <- RunUMAP(all.tree, dims = 1:30)
+DimPlot(all.tree, reduction = "umap", label = TRUE)
+table(Idents(all.tree)) 
+table(all.tree$orig.ident) 
+prop.table(table(Idents(all.tree))) 
+table(Idents(all.tree), all.tree$orig.ident) 
+```
+
+## Plot features
+````{r, echo = FALSE}
+yfg <- read.csv("C:/Users/Hannah Bishop/Desktop/MeaS/Genes for in situ.csv",stringsAsFactors=FALSE)
+
+# all.genes <- rownames(all) # same as rownames(all.tree)
+all.genes <- rownames(all@assays$RNA) 
+
+genelist <- vector()
+nomatch <- list()
+for (i in 1:12){
+  gene <- yfg[[i,2]]
+  #gene<-substr(gene,7,str_length(gene)-1)
+  loc <- grep(gene,all.genes)
+  if (length(loc)>0) {
+    genelist <- c(genelist,loc)
+  } else {
+    nomatch <- c(nomatch,yfg[[i,2]])
+  }
+}
+
+# hisat file was not able to find the following: 
+# "Ocbimv22021175" = synaptotagmin OCTOGene.20163
+# "Ocbimv22024718" = VGlut 
+# "Ocbimv22017369" = TH OCTOGene.16681
+# "Ocbimv22001324" = FMRF-amide OCTOGene.28623
+# "Ocbimv22031264" = TyrBH OCTOGene.41051
+
+DefaultAssay(all.tree) <- "RNA"
+
+DotPlot(all.tree,features=rev(all.genes[genelist[1:7]])) + RotatedAxis()
+DotPlot(all.tree, features = c("OCTOGene.20163", "OCTOGene.16681", "OCTOGene.28623", "OCTOGene.41051") #synaptotagmin, TH, FMRF-amide, TyrBH
+)
+
+FeaturePlot(all.tree,features = all.genes[genelist[1:2]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(all.tree,features = all.genes[genelist[3:4]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(all.tree,features = all.genes[genelist[5:7]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(all.tree, features = c("OCTOGene.20163", "OCTOGene.16681", "OCTOGene.28623", "OCTOGene.41051")
+)
+
+VlnPlot(all.tree,features = all.genes[genelist[1:4]], ncol = 1) + NoLegend() + NoAxes()
+VlnPlot(all.tree,features = all.genes[genelist[5:7]], ncol = 1) + NoLegend() + NoAxes()
+VlnPlot(all.tree, features = c("OCTOGene.20163", "OCTOGene.16681", "OCTOGene.28623", "OCTOGene.41051")
+)
+
+# Can also use line of code below to find candidate gene 
+#FeaturePlot(all.tree,features = all.genes[grep("VGlut",all.genes)])
