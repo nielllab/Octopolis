@@ -190,10 +190,13 @@ all <- subset(all, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.m
 }
 
 saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/HiSeqCombined_hisat.rds")
-  
+```
+
+#### Switch to Std_CCA.rmd at this step
+
 # To access individual objects: all_list[[1]]
 #example: all_list[[4]] will print the object information on Seurat object 1
-
+```{r}
 for (i in 4:length(all_list)){
   all_list[[i]] <- NormalizeData(all_list[[i]])
 }
