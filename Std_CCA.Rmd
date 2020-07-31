@@ -1,0 +1,292 @@
+---
+title: "Std_CCA.Rmd"
+author: "jos"
+date: "7/6/2020"
+output: 
+  html_document:
+    fig_height: 12
+    fig_width: 17
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = FALSE}
+# to knit document, use the following command: rmarkdown::render("/Users/josongco/Desktop/FinalSeqData/Std_CCA.Rmd") ~30m [rename file when saved so code doesn't overwrite while producing next html]
+
+library(Seurat)
+library(Matrix)
+library(ggplot2)
+library(sctransform)
+library(stringr)
+library(cowplot) # used for CCA
+library(patchwork) # used for CCA
+```
+
+```{r, echo = FALSE, eval = FALSE} 
+##### ORIG GTF
+all_list <- readRDS("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/all_list.rds") #NexSeq
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeq_orig.rds") #HiSeq
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqTrim_orig.RDS") #HiSeqTrim
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqCombined_orig.RDS") #HiSeqCombined
+
+for (i in 1:length(all_list)){
+  #all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command
+  all_list[[i]] <- NormalizeData(all_list[[i]])
+  all_list[[i]] <- FindVariableFeatures(all_list[[i]], selection.method = "vst", nfeatures = 2000)
+}
+
+saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/allStd.rds") #step not necessary with HiSeq data
+
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/allStd.rds") #step not necessary with HiSeq data
+
+## Identify anchors and integrate datasets.
+all.anchors <- FindIntegrationAnchors(object.list = all_list, anchor.features = 2000, dims = 1:30, verbose = TRUE) # can omit dims but takes a really long time to run
+allnorm.integrated <- IntegrateData(anchorset = all.anchors, verbose = TRUE)
+
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/allStdCCA.rds")
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/HiSeqStdCCA.rds")
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/HiSeqTrimStdCCA.rds")
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/HiSeqCombinedStdCCA.rds")
+
+###### v3 dataset
+## Identify anchors and integrate datasets.
+all.anchors <- FindIntegrationAnchors(object.list = all_list[2:3], anchor.features = 2000, dims = 1:30, verbose = TRUE) # can omit dims but takes a really long time to run
+allnorm.integrated <- IntegrateData(anchorset = all.anchors, verbose = TRUE)
+
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/v3StdCCA.rds")
+```
+
+```{r, echo = FALSE, eval = FALSE}
+##### HISAT GTF
+all_list <- readRDS("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/HisatAll_list.rds")
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeq_hisat.rds") #HiSeq
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqTrim_hisat.RDS") #HiSeqTrim
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqCombined_hisat.rds") #HiSeqCombined
+
+
+for (i in 1:length(all_list)){
+  #all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command
+   all_list[[i]] <- NormalizeData(all_list[[i]])
+   all_list[[i]] <- FindVariableFeatures(all_list[[i]], selection.method = "vst", nfeatures = 2000)
+}
+
+saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/Hisat_allStd.rds") # not necessary for HiSeq data
+
+
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_allStd.rds") # not necessary for HiSeq data
+
+## Identify anchors and integrate datasets.
+all.anchors <- FindIntegrationAnchors(object.list = all_list, anchor.features = 2000, dims = 1:30, verbose = TRUE) # can omit dims but takes a really long time to run
+allnorm.integrated <- IntegrateData(anchorset = all.anchors, verbose = TRUE)
+
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_allStdCCA.rds")
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqStdCCA.rds")
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqTrimStdCCA.rds")
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombinedStdCCA.rds")
+
+###### v3 dataset
+## Identify anchors and integrate datasets. 
+all.anchors <- FindIntegrationAnchors(object.list = all_list[2:3], anchor.features = 2000, dims = 1:30, verbose = TRUE) # can omit dims but takes a really long time to run
+allnorm.integrated <- IntegrateData(anchorset = all.anchors, verbose = TRUE)
+
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_v3StdCCA.rds")
+```
+
+```{r, echo = FALSE, eval = FALSE}
+#### straight merge
+all_list <- readRDS("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/all_list.rds")
+for (i in 1:length(all_list)){
+  #all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command
+  all_list[[i]] <- NormalizeData(all_list[[i]])
+}
+all <- merge(x = all_list[[1]], y = c(all_list[[2]], all_list[[3]]), add.cell.ids = c("Run1", "Run2", "Run3"))
+all <- FindVariableFeatures(all, selection.method = "vst", nfeatures = 2000)
+saveRDS(all, "/Users/josongco/Desktop/FinalSeqData/allStd_str8.rds")
+
+all_list <- readRDS("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/HisatAll_list.rds")
+for (i in 1:length(all_list)){
+  #all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command
+  all_list[[i]] <- NormalizeData(all_list[[i]])
+}
+all <- merge(x = all_list[[1]], y = c(all_list[[2]], all_list[[3]]), add.cell.ids = c("Run1", "Run2", "Run3"))
+all <- FindVariableFeatures(all, selection.method = "vst", nfeatures = 2000)
+saveRDS(all, "/Users/josongco/Desktop/FinalSeqData/Hisat_allStd_str8.rds")
+```
+
+```{r, echo = FALSE}
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/allStdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/v3StdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/allStd_str8.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_allStdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_v3StdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_allStd_str8.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqStdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqTrimStdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqCombinedStdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqStdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqTrimStdCCA.rds")
+all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombinedStdCCA.rds")
+DefaultAssay(all) <- "integrated" #omit if using straight merge
+```
+
+```{r }
+VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 3)
+VlnPlot(all, features = "nCount_RNA", y.max = 20000, pt.size = 0.001, ncol = 3)
+#plot1 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "percent.mt")
+# visualize the relationship between UMI counts and mitochondrial genes (percent)
+plot2 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+# visualize the relationship between genes (ID as >1 UMI) and mitochondrial genes
+#plot1 + plot2
+
+all <- subset(all, subset = nFeature_RNA > 500 & nFeature_RNA < 4000 & nCount_RNA <10000)
+```
+
+## Run PCA and generate UMAP
+```{r }
+all <- ScaleData(all)
+all <- RunPCA(all, npcs = 30, verbose = FALSE)
+DimHeatmap(all, dims = 1:5, cells = 500, balanced = TRUE)
+DimHeatmap(all, dims = 6:10, cells = 500, balanced = TRUE)
+DimHeatmap(all, dims = 11:15, cells = 500, balanced = TRUE)
+DimHeatmap(all, dims = 16:20, cells = 500, balanced = TRUE)
+DimHeatmap(all, dims = 21:25, cells = 500, balanced = TRUE)
+DimHeatmap(all, dims = 26:30, cells = 500, balanced = TRUE)
+
+ElbowPlot(all)
+
+#all <- JackStraw(all, dims = 30) # dims max depends on how many pcs originally calculated
+#all <- ScoreJackStraw(all, dims = 1:30)
+#JackStrawPlot(all, dims = 1:30)
+
+all <- FindNeighbors(all, dims = 1:30) 
+all <- FindClusters(all, resolution = 1)
+all <- RunUMAP(all, reduction = "pca", dims = 1:30)
+DimPlot(all, reduction = "umap", label = TRUE)
+DimPlot(all, reduction = "umap", group.by = "orig.ident")
+```
+
+## Examine cell-cluster information
+```{r }
+id_cell <- table(Idents(all))
+barplot(id_cell, main = "cell # in each cluster", xlab = "cluster ID")
+table(all$orig.ident)
+prop.table(table(Idents(all)))
+id_runs <- table(all$orig.ident, Idents(all))
+#barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "palegreen3", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # all runs
+barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # v3 chem
+```
+
+## Build a hierarchical tree
+```{r }
+all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = 1:30)
+PlotClusterTree(all.tree, label = TRUE)
+```
+
+```{r }
+all.tree <- RunUMAP(all.tree, dims = 1:30)
+DimPlot(all.tree, reduction = "umap", label = TRUE)
+
+id_cell <- table(Idents(all.tree))
+barplot(id_cell, main = "cell # in each cluster", xlab = "cluster ID")
+table(all.tree$orig.ident)
+prop.table(table(Idents(all.tree)))
+id_runs <- table(all.tree$orig.ident, Idents(all.tree))
+#barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "palegreen3", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # all runs
+barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # v3 chem
+```
+
+## Plot features
+````{r, echo = FALSE, eval = FALSE}
+#### change eval = FALSE when using HiSat
+yfg <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
+
+# all.genes <- rownames(all) # same as rownames(all.tree)
+all.genes <- rownames(all@assays$RNA) 
+
+genelist <- vector()
+nomatch <- list()
+for (i in 1:12){
+  gene <- yfg[[i,2]]
+  #gene<-substr(gene,7,str_length(gene)-1)
+  loc <- grep(gene,all.genes)
+  if (length(loc)>0) {
+    genelist <- c(genelist,loc)
+  } else {
+    nomatch <- c(nomatch,yfg[[i,2]])
+  }
+}
+
+DefaultAssay(all.tree) <- "RNA"
+
+DotPlot(all.tree,features=rev(all.genes[genelist[1:12]])) + RotatedAxis()
+
+FeaturePlot(all.tree,features = all.genes[genelist[1:2]], ncol = 1) + NoLegend() + NoAxes() 
+FeaturePlot(all.tree,features = all.genes[genelist[3:4]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(all.tree,features = all.genes[genelist[5:6]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(all.tree,features = all.genes[genelist[7:8]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(all.tree,features = all.genes[genelist[9:10]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(all.tree,features = all.genes[genelist[11:12]], ncol = 1) + NoLegend() + NoAxes()
+
+VlnPlot(all.tree,features = all.genes[genelist[1:4]], ncol = 1, pt.size = 0) + NoLegend() + xlab("") #slot = "data" uses normalized counts
+VlnPlot(all.tree,features = all.genes[genelist[5:8]], ncol = 1, pt.size = 0) + NoLegend() + xlab("")
+VlnPlot(all.tree,features = all.genes[genelist[9:12]], ncol = 1, pt.size = 0) + NoLegend() + xlab("")
+
+# Can also use line of code below to find candidate gene 
+#FeaturePlot(all.tree,features = all.genes[grep("VGlut",all.genes)])
+```
+
+```{r echo = FALSE, eval = TRUE}
+#### change eval = FALSE when using Orig GTF
+
+yfg <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
+
+#all.genes <- rownames(all) # same as rownames(all.tree)
+all.genes <- rownames(all@assays$RNA) 
+
+genelist <- vector()
+nomatch <- list()
+for (i in 1:12){
+  gene <- yfg[[i,2]]
+  #gene<-substr(gene,7,str_length(gene)-1)
+  loc <- grep(gene,all.genes)
+  if (length(loc)>0) {
+    genelist <- c(genelist,loc)
+  } else {
+    nomatch <- c(nomatch,yfg[[i,2]])
+  }
+}
+
+# hisat file was not able to find the following: 
+# "Ocbimv22021175" = synaptotagmin OCTOGene.20163
+# "Ocbimv22024718" = VGlut 
+# "Ocbimv22017369" = TH OCTOGene.16681
+# "Ocbimv22001324" = FMRF-amide OCTOGene.28623
+# "Ocbimv22031264" = TyrBH OCTOGene.41051
+
+DefaultAssay(all.tree) <- "RNA"
+
+DotPlot(all.tree,features=rev(all.genes[genelist[1:7]])) + RotatedAxis()
+DotPlot(all.tree, features = c("OCTOGene.20163", "OCTOGene.16681", "OCTOGene.28623", "OCTOGene.41051")) #synaptotagmin, TH, FMRF-amide, TyrBH)
+
+FeaturePlot(all.tree, features = all.genes[genelist[1:2]], ncol = 1) + NoLegend() + NoAxes() 
+FeaturePlot(all.tree, features = all.genes[genelist[3:4]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(all.tree, features = all.genes[genelist[5:7]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(all.tree, features = c("OCTOGene.20163", "OCTOGene.16681", "OCTOGene.28623", "OCTOGene.41051"), ncol = 1)
+
+VlnPlot(all.tree, features = all.genes[genelist[1:4]], ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
+VlnPlot(all.tree, features = all.genes[genelist[5:7]], ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
+VlnPlot(all.tree, features = c("OCTOGene.20163", "OCTOGene.16681", "OCTOGene.28623", "OCTOGene.41051"), pt.size = 0, ncol = 1)
+
+#grep("glut",all.genes)
+ #[1]  2034  4008  4599 10227 12291 14312 18187 19855 19948 27719 32028 40993 41561
+
+#VlnPlot(all.tree,features = c(all.genes[2034],all.genes[4008], all.genes[4599], all.genes[10227]), pt.size = 0, ncol = 1) 
+#VlnPlot(all.tree, features = c(all.genes[12291], all.genes[14312], all.genes[18187], all.genes[19855]), pt.size = 0, ncol = 1) 
+#VlnPlot(all.tree, features  = c(all.genes[19948], all.genes[27719], all.genes[32028], all.genes[40993], all.genes[41561]), pt.size = 0, ncol = 1) # glut
+
+# Can also use line of code below to find candidate gene 
+#FeaturePlot(all.tree,features = all.genes[grep("VGlut",all.genes)])
+#FeaturePlot(all.tree,features = all.genes[grep("glut",all.genes)]) * use this one
+```
