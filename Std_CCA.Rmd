@@ -1,7 +1,7 @@
 ---
 title: "Std_CCA.Rmd"
 author: "jos"
-date: "7/6/2020"
+date: "8/10/2020"
 output: 
   html_document:
     fig_height: 12
@@ -113,7 +113,35 @@ for (i in 1:length(all_list)){
 all <- merge(x = all_list[[1]], y = c(all_list[[2]], all_list[[3]]), add.cell.ids = c("Run1", "Run2", "Run3"))
 all <- FindVariableFeatures(all, selection.method = "vst", nfeatures = 2000)
 saveRDS(all, "/Users/josongco/Desktop/FinalSeqData/Hisat_allStd_str8.rds")
+
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/Adam/Hiseq_hisat.rds") # entire list of hiseq with min cell = 3 and min features = 500
+for (i in 1:length(all_list)){
+  #all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command
+  all_list[[i]] <- NormalizeData(all_list[[i]])
+}
+all <- merge(x = all_list[[5]], y = all_list[[6]])
+all <- FindVariableFeatures(all, selection.method = "vst", nfeatures = 2000)
+saveRDS(all, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiseqCombinedStd_str8.rds")
+
+
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqCombined2_hisat.rds")
+for (i in 1:length(all_list)){
+  #all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command
+  all_list[[i]] <- NormalizeData(all_list[[i]])
+}
+
+all <- merge(x = all_list[[1]], y = all_list[[2]], add.cell.ids = c("CombinedRun1", "CombinedRun2"))
+all <- FindVariableFeatures(all, selection.method = "vst", nfeatures = 2000)
+saveRDS(all, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiseqCombinedStd_str8.rds")
 ```
+
+
+```{r, echo = FALSE}
+PC = 30
+DM = 1:30
+DMset = 30
+```
+
 
 ```{r, echo = FALSE}
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/allStdCCA.rds")
@@ -128,43 +156,80 @@ saveRDS(all, "/Users/josongco/Desktop/FinalSeqData/Hisat_allStd_str8.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqTrimStdCCA.rds")
 all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombinedStdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiseqCombinedStd_str8.rds")
+
 DefaultAssay(all) <- "integrated" #omit if using straight merge
 ```
 
 ```{r }
-VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 3)
-VlnPlot(all, features = "nCount_RNA", y.max = 20000, pt.size = 0.001, ncol = 3)
+VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
+VlnPlot(all, features = "nCount_RNA", y.max = 20000, pt.size = 0.0001, ncol = 3)
 #plot1 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "percent.mt")
 # visualize the relationship between UMI counts and mitochondrial genes (percent)
 plot2 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
 # visualize the relationship between genes (ID as >1 UMI) and mitochondrial genes
 #plot1 + plot2
 
-all <- subset(all, subset = nFeature_RNA > 500 & nFeature_RNA < 4000 & nCount_RNA <10000)
+all <- subset(all, subset = nFeature_RNA > 500 & nFeature_RNA < 7000 & nCount_RNA <30000)
 ```
 
 ## Run PCA and generate UMAP
 ```{r }
 all <- ScaleData(all)
-all <- RunPCA(all, npcs = 30, verbose = FALSE)
-DimHeatmap(all, dims = 1:5, cells = 500, balanced = TRUE)
-DimHeatmap(all, dims = 6:10, cells = 500, balanced = TRUE)
-DimHeatmap(all, dims = 11:15, cells = 500, balanced = TRUE)
-DimHeatmap(all, dims = 16:20, cells = 500, balanced = TRUE)
-DimHeatmap(all, dims = 21:25, cells = 500, balanced = TRUE)
-DimHeatmap(all, dims = 26:30, cells = 500, balanced = TRUE)
+all <- RunPCA(all, npcs = PC, verbose = FALSE)
+DimHeatmap(all, dims = 1:10, cells = 500, balanced = TRUE)
+#DimHeatmap(all, dims = 1:5, cells = 500, balanced = TRUE)
+#DimHeatmap(all, dims = 6:10, cells = 500, balanced = TRUE)
+#DimHeatmap(all, dims = 11:15, cells = 500, balanced = TRUE)
+#DimHeatmap(all, dims = 16:20, cells = 500, balanced = TRUE)
+#DimHeatmap(all, dims = 21:25, cells = 500, balanced = TRUE)
+#DimHeatmap(all, dims = 26:30, cells = 500, balanced = TRUE)
 
-ElbowPlot(all)
+ElbowPlot(all, ndims = DMset)
 
 #all <- JackStraw(all, dims = 30) # dims max depends on how many pcs originally calculated
 #all <- ScoreJackStraw(all, dims = 1:30)
 #JackStrawPlot(all, dims = 1:30)
 
-all <- FindNeighbors(all, dims = 1:30) 
+all <- FindNeighbors(all, dims = DM) 
 all <- FindClusters(all, resolution = 1)
-all <- RunUMAP(all, reduction = "pca", dims = 1:30)
+all <- RunUMAP(all, reduction = "pca", dims = DM)
 DimPlot(all, reduction = "umap", label = TRUE)
 DimPlot(all, reduction = "umap", group.by = "orig.ident")
+```
+
+```{r}
+# subset min.features = 750 (all2)
+all2 <- subset(all, subset = nFeature_RNA > 750 & nFeature_RNA < 7000 & nCount_RNA <30000)
+all2 <- ScaleData(all2)
+all2 <- RunPCA(all2, npcs = PC, verbose = FALSE)
+all2 <- FindNeighbors(all2, dims = DM) 
+all2 <- FindClusters(all2, resolution = 1)
+all2 <- RunUMAP(all2, reduction = "pca", dims = DM)
+DimPlot(all2, reduction = "umap", label = TRUE)
+DimPlot(all2, reduction = "umap", group.by = "orig.ident")
+id_cell <- table(Idents(all2))
+barplot(id_cell, main = "cell # in each cluster", xlab = "cluster ID")
+table(all2$orig.ident)
+prop.table(table(Idents(all2)))
+id_runs <- table(all2$orig.ident, Idents(all2))
+#barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "palegreen3", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # all runs
+barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # v3 chem
+all2.tree <- BuildClusterTree(all2, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = DM)
+PlotClusterTree(all2.tree, label = TRUE)
+all2.tree <- RunUMAP(all2.tree, dims = DM)
+DimPlot(all2.tree, reduction = "umap", label = TRUE)
+
+id_cell <- table(Idents(all2.tree))
+barplot(id_cell, main = "cell # in each cluster", xlab = "cluster ID")
+table(all2.tree$orig.ident)
+prop.table(table(Idents(all2.tree)))
+id_runs <- table(all2.tree$orig.ident, Idents(all2.tree))
+#barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "palegreen3", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # all runs
+barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # v3 chem
+
+VlnPlot(all2, features = "nCount_RNA", y.max = 20000, pt.size = 0.001, ncol = 1)
+VlnPlot(all2, features = "nFeature_RNA", y.max = 20000, pt.size = 0.001, ncol = 1)
 ```
 
 ## Examine cell-cluster information
@@ -180,12 +245,12 @@ barplot(id_runs, main = "relationship between cluster ID and run representation"
 
 ## Build a hierarchical tree
 ```{r }
-all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = 1:30)
+all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = DM)
 PlotClusterTree(all.tree, label = TRUE)
 ```
 
 ```{r }
-all.tree <- RunUMAP(all.tree, dims = 1:30)
+all.tree <- RunUMAP(all.tree, dims = DM)
 DimPlot(all.tree, reduction = "umap", label = TRUE)
 
 id_cell <- table(Idents(all.tree))
@@ -195,7 +260,37 @@ prop.table(table(Idents(all.tree)))
 id_runs <- table(all.tree$orig.ident, Idents(all.tree))
 #barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "palegreen3", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # all runs
 barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # v3 chem
+
+VlnPlot(all.tree, features = "nCount_RNA", y.max = 20000, pt.size = 0.001, ncol = 1)
+VlnPlot(all.tree, features = "nFeature_RNA", y.max = 20000, pt.size = 0.001, ncol = 1)
 ```
+
+# ID cluster markers based on dendogram renumbering
+```{r}
+markers_list = list()
+for (m in 1:nlevels(all.tree$seurat_clusters)){
+  markersROC <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
+  markersROC <- setNames(cbind(rownames(markersROC), markersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
+  markersROC$diff_exp <- (markersROC$pct.1/markersROC$pct.2)
+  markersROC <- markersROC[order(-markersROC$diff_exp),]
+  markers_list[[m]] = markersROC
+  paste("Cluster", m, sep = "")
+  print(head(markersROC$geneID, n = 5))
+}
+
+#test 
+#cluster2.markersROC <- FindMarkers(all.tree, ident.1 = 2, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
+#write.csv(cluster2.markersROC, "/Users/josongco/Desktop/FinalSeqData/cluster2markers15pc.csv")
+
+#print(head(markersROC, max.levels = 5))
+#markersROC <- setNames(cbind(rownames(markersROC), markersROC, row.names = NULL), 
+ #       c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
+#markersROC$diff_exp <- (markersROC$pct.1/markersROC$pct.2)
+#markersROC_sort <- markersROC[order(-markersROC$diff_exp),]
+#print(head(markersROC$geneID, max.levels = 5))
+#row.names(markers_list[[1]])
+```
+
 
 ## Plot features
 ````{r, echo = FALSE, eval = FALSE}
