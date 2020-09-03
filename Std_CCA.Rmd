@@ -243,38 +243,51 @@ VlnPlot(all.tree, features = "nFeature_RNA", y.max = 20000, pt.size = 0, ncol = 
 
 ## ID cluster markers based on dendogram renumbering
 ```{r} 
+# chunk (editing) in progress 9/3/20 12:07am
+# nlevels(all.tree$seurat_clusters)
 markers_list = list()
-for (m in 1:nlevels(all.tree$seurat_clusters)){
+for (m in 1:2){
   markersROC <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
   markersROC <- setNames(cbind(rownames(markersROC), markersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
   markersROC$diff_exp <- (markersROC$pct.1/markersROC$pct.2)
   markersROC <- markersROC[order(-markersROC$diff_exp),]
   markers_list[[m]] = markersROC
-  header <- paste("Cluster", all.tree$seurat_clusters[m], sep = " ")
-  top5markers <- paste(head(markersROC$geneID, n = 5))
+  markersROC$header[m] <- paste("Cluster", all.tree$seurat_clusters[m], sep = " ")
+  markersROC$top5markers[m] <- paste((head(markersROC[m]$geneID, n = 5)))
   marker_output <- c(header, top5markers)
-  topfeatures[[m]] <- head(markersROC[m]$geneID, n = 5) 
-  DotPlot(all.tree, features = topfeatures[[m]]) 
+  print(marker_output)
+  #topfeatures[[m]] <- head(markers_list[[m]][["geneID"]], n = 5) 
+  #DotPlot(all.tree, features = topfeatures[m]) 
 }
 ```
 
 ## ID markers for nodes/connecting points of dendogram
 ```{r}
+# length(nodes)
 nodes <- unique(all.tree@tools$BuildClusterTree$edge[,1])
 node_markers = list()
-for (n in 1:length(nodes)){
+for (n in 1:2){
   nodemarkersROC <- FindMarkers(all.tree, ident.1 = "clustertree", ident.2 = nodes[n], logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
   nodemarkersROC <- setNames(cbind(rownames(nodemarkersROC), nodemarkersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
   nodemarkersROC$diff_exp <- (nodemarkersROC$pct.1/nodemarkersROC$pct.2)
   nodemarkersROC <- nodemarkersROC[order(-nodemarkersROC$diff_exp),]
   node_markers[[n]] = nodemarkersROC
+  
   node_header <- paste("Node", nodes[n], sep = " ")
   top5nodemarkers <- paste(head(nodemarkersROC$geneID, n = 5))
   nodemarker_output <- c(node_header, top5nodemarkers)
   print(nodemarker_output)
-  topnodefeatures[[n]] <- head(nodemarkersROC[n]$geneID, n = 5) 
-  DotPlot(all.tree, features = topnodefeatures[[n]])+ RotatedAxis() # can ID which node to view genes
+  nodefeatures_df <- data.frame(Col1 = rep(nodes[n], 5), Col2 = top5nodemarkers[n]) 
+        print(head(nodefeatures_df))
+        nodefeatures_df.merged <- nodefeatures_df[n] %>%
+            dplyr::group_by(Col1) %>%
+            dplyr::summarize(Col2 = paste(nodefeatures_df$Col2, collapse = ", "))
+  print(head(nodefeatures_df.merged))
+  #topnodefeatures[[n]] <- head(nodemarkersROC[n]$geneID, n = 5) 
+  #nodefeatures_df <- data.frame(nodes[[2]], (headtopnodefeatures[[2]], n = 5))
+  DotPlot(all.tree, features = nodefeatures_df.merged$Col2)+ RotatedAxis() # can ID which node to view genes
 }
+
 ```
 
 ## Plot features
@@ -349,7 +362,7 @@ for (i in 1:12){
 DefaultAssay(all.tree) <- "RNA"
 
 DotPlot(all.tree,features=rev(all.genes[genelist[1:7]])) + RotatedAxis()
-DotPlot(all.tree, features = c("OCTOGene.20163", "OCTOGene.16681", "OCTOGene.28623", "OCTOGene.41051")) #synaptotagmin, TH, FMRF-amide, TyrBH)
+DotPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051")) #synaptotagmin, TH, FMRF-amide, TyrBH)
 
 FeaturePlot(all.tree, features = all.genes[genelist[1:2]], ncol = 1) + NoLegend() + NoAxes() 
 FeaturePlot(all.tree, features = all.genes[genelist[3:4]], ncol = 1) + NoLegend() + NoAxes()
