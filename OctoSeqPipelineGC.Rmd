@@ -45,11 +45,12 @@ library(stringr)
 ## Read in files
 ```{r}
 # read in csv with the directories
-datafiles <- read.csv("directoryMaster_070720.csv", stringsAsFactors = FALSE)
+datafiles <- read.csv("directoryMaster_070720.csv", stringsAsFactors = FALSE) 
+# mea directory pathway: "~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/directoryMaster_070720.csv"
 #str(datafiles) # view the structure of the data frame
 data_dir <- as.vector(datafiles$Directory)
 # read in csv namekey
-namekey <- read.csv("fulldf_namekey.csv", stringsAsFactors = FALSE)
+namekey <- read.csv("fulldf_namekey.csv", stringsAsFactors = FALSE) # geneIDs_miniNCBI_fulldf_namekey.csv
 
 ```
 
@@ -72,13 +73,13 @@ unclass(by(namekey, namekey$OctoGene, function(x) {
 
 #Check that the hashmap is working properly
 print(namekeyDict[["OCTOGene.1"]]) #should print "OG.1"
-print(namekeyDict[["OCTOGene.10032"]]) #should print "NA-Oc29021-OG.100"
+print(namekeyDict[["OCTOGene.10032"]]) #should print "NA-Oc29021-OG.100" ; now prints anaphase-promoting-complex-subunit-7-OG10032-OB29021"
 ```
 
 ```{r}
 ct = 1
-for(f in 17:18){ #New gtf, NextSeq + HiSeq from directory master
-  all <- Read10X(data.dir = data_dir[f])
+for(f in 1:2){ #New gtf, NextSeq + HiSeq from directory master
+  all <- Read10X(data.dir = data_dir[f+16])
   ngenes <- length(all@Dimnames[[1]])
   for (g in 1:ngenes){
       gene <- all@Dimnames[[1]][g]
@@ -92,7 +93,7 @@ for(f in 17:18){ #New gtf, NextSeq + HiSeq from directory master
   ct = ct + 1
 }
 
-saveRDS(all_list, "~/hisatAll_list.rds")
+saveRDS(all_list, "~/hisatAll_list9120.rds")
   
 # To access individual objects: all_list[[1]]
 #example: all_list[[1]] will print the object information on Seurat object 1
