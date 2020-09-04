@@ -31,6 +31,7 @@ all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeq_orig.rds") #HiSe
 all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqTrim_orig.RDS") #HiSeqTrim
 all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqCombined_orig.RDS") #HiSeqCombined
 
+
 for (i in 1:length(all_list)){
   #all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command
   all_list[[i]] <- NormalizeData(all_list[[i]])
@@ -145,6 +146,48 @@ DMset = 30
 ```
 
 
+```{r}
+# functions to trim labels
+# these could be merged to be one function with multiple options
+# and maybe do something more interesting like trim post OG
+# each takes in a ggplot variable and max label length to trim to
+# returns the updated plot variable
+
+# trim labels on x-axis
+trimLabelsX <- function(p,len){
+  pp<- ggplot_build(p)
+  oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x.labels
+  newxlabels = oldxlabels
+  for (i in 1:length(oldxlabels)){
+    newxlabels[[i]] =  substr(oldxlabels[[i]],1,len)
+  }
+ p<- p + scale_x_discrete(labels = newxlabels)
+}
+
+#trim labels on y-axies
+trimLabelsY <- function(p,len){
+  pp<- ggplot_build(p)
+  
+  oldylabels = ggplot_build(p)$layout$panel_params[[1]]$y.labels
+  newylabels = oldylabels
+```
+
+
+```{r}
+for (i in 1:length(oldylabels)){
+    newylabels[[i]] =  substr(oldylabels[[i]],1,len)
+  }
+  p + scale_y_discrete(labels = newylabels)
+}
+
+trimTitle <- function(p,len){
+  title = ggplot_build(p)$plot$labels$title
+  newtitle = substr(title,1,len)
+  p + labs(title=newtitle)
+}
+```
+
+
 ```{r, echo = FALSE}
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/allStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/v3StdCCA.rds")
@@ -159,7 +202,8 @@ DMset = 30
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqTrimStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombinedStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiseqCombinedStd_str8.rds")
-all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds")
+all <- readRDS("D:/data/octo seq/Hisat_HiSeqCombined9120StdCCA.rds")
 
 DefaultAssay(all) <- "integrated" #omit if using straight merge
 ```
@@ -194,7 +238,10 @@ VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
 ```{r }
 all <- ScaleData(all)
 all <- RunPCA(all, npcs = PC, verbose = FALSE)
-DimHeatmap(all, dims = 1:10, cells = 500, balanced = TRUE)
+for (i in 1:30){ 
+p<-DimHeatmap(all, dims = i, cells = 500, balanced = TRUE)
+print(p)
+}
 #DimHeatmap(all, dims = 1:5, cells = 500, balanced = TRUE)
 #DimHeatmap(all, dims = 6:10, cells = 500, balanced = TRUE)
 #DimHeatmap(all, dims = 11:15, cells = 500, balanced = TRUE)
@@ -222,9 +269,9 @@ DimPlot(all, reduction = "umap", group.by = "orig.ident")
 ```{r }
 all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = DM)
 PlotClusterTree(all.tree, label = TRUE)
-all.tree <- FindNeighbors(all.tree, dims = DM) 
-all.tree <- FindClusters(all.tree, resolution = 1)
-all.tree <- RunUMAP(all.tree, dims = DM)
+#all.tree <- FindNeighbors(all.tree, dims = DM) 
+#all.tree <- FindClusters(all.tree, resolution = 1)
+#all.tree <- RunUMAP(all.tree, dims = DM)
 DimPlot(all.tree, reduction = "umap", label = TRUE)
 DimPlot(all.tree, reduction = "umap", group.by = "orig.ident")
 ```
@@ -240,7 +287,7 @@ id_runs <- table(all.tree$orig.ident, Idents(all.tree))
 barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # v3 chem
 
 VlnPlot(all.tree, features = "nCount_RNA", y.max = 20000, pt.size = 0, ncol = 1)
-VlnPlot(all.tree, features = "nFeature_RNA", y.max = 20000, pt.size = 0, ncol = 1)
+VlnPlot(all.tree, features = "nFeature_RNA", y.max = 7500, pt.size = 0, ncol = 1)
 ```
 
 ## ID cluster markers based on dendogram renumbering
@@ -300,66 +347,42 @@ for (n in 1:length(nodes)){
 
 ## Plot features
 ````{r, echo = FALSE, eval = FALSE}
-####change eval = FALSE when using HiSat
-yfg <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
-
-# all.genes <- rownames(all) # same as rownames(all.tree)
+### function to find list of ocbims in all gene names
+### takes a list of ocbims, returns matching index for each one
 all.genes <- rownames(all.tree@assays$RNA) 
 
-genelist <- vector()
-nomatch <- list()
-for (i in 1:12){
-  gene <- yfg[[i,2]]
-  gene<-substr(gene,7,str_length(gene)-1)
-  loc <- grep(gene,all.genes)
-  if (length(loc)>0) {
-    genelist <- c(genelist,loc)
-  } else {
-    nomatch <- c(nomatch,yfg[[i,2]])
+findGenes <- function(yfg,allgenes) {
+  genelist <- vector()
+  nomatch <- list()
+  for (i in 1:length(yfg)){
+    gene <- yfg[[i]]
+    gene<-substr(gene,10,str_length(gene))
+    gene<- paste("OB", gene, sep = "")
+    loc <- grep(gene,allgenes)
+    # check that there was one identified, and that the gene wasn't empty (will be OB and match everything!)
+    if (length(loc)>0& nchar(gene)>2) {
+      genelist <- c(genelist,loc)
+    } else {
+      nomatch <- c(nomatch,yfg[[i]])
+    }
   }
+  return(genelist)
 }
 
-DefaultAssay(all.tree) <- "RNA"
-
-DotPlot(all.tree,features=rev(all.genes[genelist[1:12]])) + RotatedAxis()
-
-FeaturePlot(all.tree,features = all.genes[genelist[1:2]], ncol = 1) + NoLegend() + NoAxes() 
-FeaturePlot(all.tree,features = all.genes[genelist[3:4]], ncol = 1) + NoLegend() + NoAxes()
-FeaturePlot(all.tree,features = all.genes[genelist[5:6]], ncol = 1) + NoLegend() + NoAxes()
-FeaturePlot(all.tree,features = all.genes[genelist[7:8]], ncol = 1) + NoLegend() + NoAxes()
-FeaturePlot(all.tree,features = all.genes[genelist[9:10]], ncol = 1) + NoLegend() + NoAxes()
-FeaturePlot(all.tree,features = all.genes[genelist[11:12]], ncol = 1) + NoLegend() + NoAxes()
-
-VlnPlot(all.tree,features = all.genes[genelist[1:4]], ncol = 1, pt.size = 0) + NoLegend() + xlab("") #slot = "data" uses normalized counts
-VlnPlot(all.tree,features = all.genes[genelist[5:8]], ncol = 1, pt.size = 0) + NoLegend() + xlab("")
-VlnPlot(all.tree,features = all.genes[genelist[9:12]], ncol = 1, pt.size = 0) + NoLegend() + xlab("")
-
-# Can also use line of code below to find candidate gene 
-#FeaturePlot(all.tree,features = all.genes[grep("VGlut",all.genes)])
 ```
 
 ```{r echo = FALSE, eval = FALSE}
 ## USE ME
 #### change eval = FALSE when using Orig GTF
 
-yfg <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
+#yfg <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
 
-#all.genes <- rownames(all) # same as rownames(all.tree)
-all.genes <- rownames(all.tree@assays$RNA) 
+yfg <- read.csv("D:/data/octo seq/Genes for in situ.csv",stringsAsFactors=FALSE)
 
-genelist <- vector()
-nomatch <- list()
-for (i in 1:12){
-  gene <- yfg[[i,2]]
-  gene<-substr(gene,10,str_length(gene))
-  gene<- paste("OB", gene, sep = "")
-  loc <- grep(gene,all.genes)
-  if (length(loc)>0) {
-    genelist <- c(genelist,loc)
-  } else {
-    nomatch <- c(nomatch,yfg[[i,2]])
-  }
-}
+# find match for yfg and all gene names
+
+genelist <- findGenes(yfg[1:12,2],all.genes)
+
 
 # hisat file was not able to find the following: 
 # "Ocbimv22021175" = synaptotagmin OG.20163
@@ -370,16 +393,31 @@ for (i in 1:12){
 
 DefaultAssay(all.tree) <- "RNA"
 
-DotPlot(all.tree,features=rev(all.genes[genelist[1:7]])) + RotatedAxis()
+# dotplot of all genes from list
+p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()
+p<- trimLabelsX(p,20)
+print(p)
+
+# featureplot of all genes in list
+for (i in 1:length(genelist)){
+  p<- FeaturePlot(all.tree, features = all.genes[genelist[i]], ncol = 1) + NoLegend() + NoAxes() 
+  p<- trimTitle(p,30)
+  print(p)
+}
+
+# violin plot for all genes in list
+for (i in 1:length(genelist)){
+  p <- VlnPlot(all.tree, features = all.genes[genelist[i]], ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
+  p<-trimTitle(p,30)
+  print(p)
+}
+
+#dotplot of some selected genes
 DotPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051")) #synaptotagmin, TH, FMRF-amide, TyrBH)
 
-FeaturePlot(all.tree, features = all.genes[genelist[1:2]], ncol = 1) + NoLegend() + NoAxes() 
-FeaturePlot(all.tree, features = all.genes[genelist[3:4]], ncol = 1) + NoLegend() + NoAxes()
-FeaturePlot(all.tree, features = all.genes[genelist[5:7]], ncol = 1) + NoLegend() + NoAxes()
 FeaturePlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051"), ncol = 1)
 
-VlnPlot(all.tree, features = all.genes[genelist[1:4]], ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
-VlnPlot(all.tree, features = all.genes[genelist[5:7]], ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
+
 VlnPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051"), pt.size = 0, ncol = 1)
 
 #grep("glut",all.genes)
@@ -392,4 +430,30 @@ VlnPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051"), 
 # Can also use line of code below to find candidate gene 
 #FeaturePlot(all.tree,features = all.genes[grep("VGlut",all.genes)])
 #FeaturePlot(all.tree,features = all.genes[grep("glut",all.genes)]) * use this one
+```
+
+
+```{r echo = FALSE, eval = FALSE}
+# grep for genes
+genelist = grep("neuropeptide",all.genes, ignore.case = TRUE)
+
+# dotplot
+p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()
+p<- trimLabelsX(p,20)
+print(p)
+
+#feature plots
+
+for (i in 1:length(genelist)){
+  p<- FeaturePlot(all.tree, features = all.genes[genelist[i]], ncol = 1) + NoLegend() + NoAxes() 
+  p<- trimTitle(p,30)
+  print(p)
+}
+
+```
+
+
+
+```{r}
+
 ```
