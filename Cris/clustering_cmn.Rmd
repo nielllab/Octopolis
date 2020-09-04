@@ -541,6 +541,42 @@ DotPlot(all.normTREE,features=all.genes[cadh[101:150]]) + RotatedAxis()+ theme(a
 DotPlot(all.normTREE,features=all.genes[cadh[151:193]]) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
 
 ```
+```{r}
+
+
+p<-DotPlot(all.normTREE,features=all.genes[cadh[151:193]]) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+
+p<-trimLabelsX(p,10)
+print(p)
+
+
+```
+
+
+
+```{r}
+trimLabelsX <- function(p,len){
+  pp<- ggplot_build(p)
+  oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x.labels
+  newxlabels = oldxlabels
+  for (i in 1:length(oldxlabels)){
+    newxlabels[[i]] =  substr(oldxlabels[[i]],1,len)
+  }
+ p<- p + scale_x_discrete(labels = newxlabels)
+}
+
+trimLabelsY <- function(p,len){
+  pp<- ggplot_build(p)
+  
+  oldylabels = ggplot_build(p)$layout$panel_params[[1]]$y.labels
+  newylabels = oldylabels
+  for (i in 1:length(oldylabels)){
+    newylabels[[i]] =  substr(oldylabels[[i]],1,len)
+  }
+  p + scale_y_discrete(labels = newylabels)
+}
+
+```
 
 ```{r}
 FeaturePlot(all.normTREE,features = all.genes[grep("protocadherin",all.genes,ignore.case=TRUE)])
