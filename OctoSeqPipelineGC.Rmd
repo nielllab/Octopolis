@@ -51,7 +51,7 @@ datafiles <- read.csv("directoryMaster_070720.csv", stringsAsFactors = FALSE)
 data_dir <- as.vector(datafiles$Directory)
 # read in csv namekey
 namekey <- read.csv("fulldf_namekey.csv", stringsAsFactors = FALSE) # geneIDs_miniNCBI_fulldf_namekey.csv (9120)
-# "~/Google Drive/miller niell octo seq/projects data/scRNAseq/Seurat/gene lists/geneIDs_miniNCBI_namekey_Sep3.csv" (9320)
+# "~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/geneIDs_miniNCBI_namekey_Sep3.csv" (9320)
 
 
 ```
@@ -74,7 +74,7 @@ unclass(by(namekey, namekey$OctoGene, function(x) {
   })) -> namekeyDict
 
 #Check that the hashmap is working properly
-print(namekeyDict[["OCTOGene.1"]]) #should print "OG.1" ; did not work
+print(namekeyDict[["OCTOGene.1"]]) #should print "OG.1" ; did not work (error: Error in namekeyDict[["OCTOGene.1"]] : subscript out of bounds)
 print(namekeyDict[["OCTOGene.10032"]]) #should print "NA-Oc29021-OG.100" ; now prints anaphase-promoting-complex-subunit-7-OG10032-OB29021" ; now prints "NA-anaphase-promoting-complex-subunit-7"
 ```
 
