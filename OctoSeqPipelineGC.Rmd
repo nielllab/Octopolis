@@ -50,7 +50,9 @@ datafiles <- read.csv("directoryMaster_070720.csv", stringsAsFactors = FALSE)
 #str(datafiles) # view the structure of the data frame
 data_dir <- as.vector(datafiles$Directory)
 # read in csv namekey
-namekey <- read.csv("fulldf_namekey.csv", stringsAsFactors = FALSE) # geneIDs_miniNCBI_fulldf_namekey.csv
+namekey <- read.csv("fulldf_namekey.csv", stringsAsFactors = FALSE) # geneIDs_miniNCBI_fulldf_namekey.csv (9120)
+# "~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/geneIDs_miniNCBI_namekey_Sep3.csv" (9320)
+
 
 ```
 
@@ -66,14 +68,14 @@ all_list = list()
 
 #making a hashmap of OctoGenes to fullnames from the seurat namekey
 unclass(by(namekey, namekey$OctoGene, function(x) {
-  tmp <- x$fullname
+  tmp <- x$ID
   setNames(tmp, x$OctoGene[1])
   tmp
   })) -> namekeyDict
 
 #Check that the hashmap is working properly
-print(namekeyDict[["OCTOGene.1"]]) #should print "OG.1"
-print(namekeyDict[["OCTOGene.10032"]]) #should print "NA-Oc29021-OG.100" ; now prints anaphase-promoting-complex-subunit-7-OG10032-OB29021"
+print(namekeyDict[["OCTOGene.1"]]) #should print "OG.1" ; did not work (error: Error in namekeyDict[["OCTOGene.1"]] : subscript out of bounds)
+print(namekeyDict[["OCTOGene.10032"]]) #should print "NA-Oc29021-OG.100" ; now prints anaphase-promoting-complex-subunit-7-OG10032-OB29021" ; now prints "NA-anaphase-promoting-complex-subunit-7"
 ```
 
 ```{r}
@@ -88,12 +90,14 @@ for(f in 1:2){ #New gtf, NextSeq + HiSeq from directory master
          all@Dimnames[[1]][g] <- temp
          }
       }
-  all <- CreateSeuratObject(counts = all, project = paste("Run", f, sep = ""), min.cells = 3, min.features = 200)
+  all <- CreateSeuratObject(counts = all, project = paste("Run", f, sep = ""), min.cells = 3, min.features = 500)
   all_list[[ct]] = all
   ct = ct + 1
 }
 
-saveRDS(all_list, "~/hisatAll_list9120.rds")
+# error: Error in namekeyDict[[gene]] : subscript out of bounds
+
+saveRDS(all_list, "~/hisatAll_list9320.rds")
   
 # To access individual objects: all_list[[1]]
 #example: all_list[[1]] will print the object information on Seurat object 1

@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, echo = FALSE}
-# to knit document, use the following command: rmarkdown::render("/Users/josongco/Desktop/FinalSeqData/Std_CCA.Rmd") ~30m [rename file when saved so code doesn't overwrite while producing next html]
+# to knit document, use the following command: rmarkdown::render("/Users/josongco/GitHub/Octopolis/Std_CCA.Rmd") ~30m [rename file when saved so code doesn't overwrite while producing next html]
 
 library(Seurat)
 library(Matrix)
@@ -22,6 +22,7 @@ library(sctransform)
 library(stringr)
 library(cowplot) # used for CCA
 library(patchwork) # used for CCA
+library(dplyr) # used for print markers
 ```
 
 ```{r, echo = FALSE, eval = FALSE} 
@@ -137,13 +138,11 @@ all <- FindVariableFeatures(all, selection.method = "vst", nfeatures = 2000)
 saveRDS(all, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiseqCombinedStd_str8.rds")
 ```
 
-
 ```{r, echo = FALSE}
 PC = 30
 DM = 1:30
 DMset = 30
 ```
-
 
 ```{r, echo = FALSE}
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/allStdCCA.rds")
@@ -176,14 +175,14 @@ plot2
 ```
 
 ## Subset nFeature > 500
-```{r}
+```{r }
 all <- subset(all, subset = nFeature_RNA > 500 & nFeature_RNA < 7000 & nCount_RNA <30000)
 # eval features after subsetting: 
 VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
 ```
 
 ## Subset nFeature > 750
-```{r}
+```{r }
 # subset min.features = 750 
 all <- subset(all, subset = nFeature_RNA > 750 & nFeature_RNA < 7000 & nCount_RNA <30000)
 # eval features after subsetting: 
@@ -209,7 +208,7 @@ ElbowPlot(all, ndims = DMset)
 #JackStrawPlot(all, dims = DM)
 ```
 
-```{r echo = FALLSE, eval = FALSE}
+```{r echo = FALSE}
 # original clustering
 all <- FindNeighbors(all, dims = DM) 
 all <- FindClusters(all, resolution = 1)
@@ -244,9 +243,10 @@ VlnPlot(all.tree, features = "nFeature_RNA", y.max = 20000, pt.size = 0, ncol = 
 ```
 
 ## ID cluster markers based on dendogram renumbering
-```{r} 
+```{r, echo = TRUE, eval = FALSE} 
+# error: Cannot find the following identities in the object: 43
 markers_list = list()
-for (m in 1:nlevels(all.tree$seurat_clusters)){
+for (m in 1:nlevels((all.tree$seurat_clusters))){
   markersROC <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
   markersROC <- setNames(cbind(rownames(markersROC), markersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
   markersROC$diff_exp <- (markersROC$pct.1/markersROC$pct.2)
@@ -269,7 +269,9 @@ for (m in 1:nlevels(all.tree$seurat_clusters)){
 ```
 
 ## ID markers for nodes/connecting points of dendogram
-```{r}
+```{r echo = TRUE, eval = FALSE}
+# error: Error in WhichCells.Seurat(object = object, idents = ident.2) : 
+  # continued Cannot find the following identities in the object: 43
 nodes <- unique(all.tree@tools$BuildClusterTree$edge[,1])
 node_markers = list()
 for (n in 1:length(nodes)){
