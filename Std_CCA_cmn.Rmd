@@ -171,10 +171,6 @@ trimLabelsY <- function(p,len){
   
   oldylabels = ggplot_build(p)$layout$panel_params[[1]]$y.labels
   newylabels = oldylabels
-```
-
-
-```{r}
 for (i in 1:length(oldylabels)){
     newylabels[[i]] =  substr(oldylabels[[i]],1,len)
   }
