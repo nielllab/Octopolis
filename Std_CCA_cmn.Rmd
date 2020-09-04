@@ -290,8 +290,8 @@ VlnPlot(all.tree, features = "nFeature_RNA", y.max = 7500, pt.size = 0, ncol = 1
 ```{r, echo = TRUE, eval = FALSE} 
 # error: Cannot find the following identities in the object: 43
 markers_list = list()
-#for (m in 1:nlevels((all.tree$seurat_clusters))){
-for (m in 1:3){
+for (m in 1:nlevels((all.tree$seurat_clusters))){
+#for (m in 1:3){
   markersROC <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.5, test.use = "roc", only.pos = TRUE)
   markersROC <- setNames(cbind(rownames(markersROC), markersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
   markersROC$diff_exp <- (markersROC$pct.1/markersROC$pct.2)
