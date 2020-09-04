@@ -1,0 +1,101 @@
+---
+title: "OctoSeqPipeline"
+author: "Mea & Gabby"
+date: "8/20/2020"
+output: html_document
+---
+This is the protocol for analyzing Octo Seq data using RStudio (3.6.3), Seurat (3.1.4), Mac (OS Catalina 10.15.3). The first steps outline how to get started with RStudio and Seurat and how to set up sshfs for Mac in order to access raw data from the Talapas server. If you have already set up R, RStudio, Seurat, and sshfs, then you can begin at section "Mount to Talapas" and proceed with setting your working directory and reading in the raw data.
+
+## Download Seurat packages (source: https://satijalab.org/seurat/install.html) ~15m
+# Enter commands in R or RStudio
+```{r}
+install.packages('BiocManager')
+BiocManager::install('multtest') 
+# Do you want to install from sources the packages which need compilation? (y/n/cancel); update a/s/n? a
+install.packages('Seurat')
+# package which is only available in source form, and may need compilation? (y/n) Yes
+install.packages("sn")
+library(Seurat)
+# Would you like to install Miniconda? (y/n) Y
+```
+## Download FUSE for macOS to be able to mount to Talapas using sshfs
+Go to this website: https://osxfuse.github.io
+Follow instructions and allow Benjamin Fisher access through System Preferences
+Install Brew packagemanager (source: https://brew.sh): in terminal command, enter: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)" 
+In terminal command, enter: brew install sshfs 
+
+# Mount to talapas
+In terminal command, enter: sshfs gcoffing@talapas-ln1.uoregon.edu:/projects/niell/shared/Octopus /Users/gcoffing/Octopus 
+Prior to mounting, user will need to create a directory to mount to; in my case, I created the directory "Octopus"
+
+## Set working directory (run this line of code from the console rather than in a chunk)
+```{r}
+setwd("/Users/gcoffing/Documents/Documents/octo/Seurat")
+```
+
+## Load libraries for Seurat
+```{r}
+library(Seurat)
+library(Matrix)
+library(ggplot2)
+library(sctransform)
+library(stringr)
+```
+
+## Read in files
+```{r}
+# read in csv with the directories
+datafiles <- read.csv("directoryMaster_070720.csv", stringsAsFactors = FALSE) 
+# mea directory pathway: "~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/directoryMaster_070720.csv"
+#str(datafiles) # view the structure of the data frame
+data_dir <- as.vector(datafiles$Directory)
+# read in csv namekey
+namekey <- read.csv("fulldf_namekey.csv", stringsAsFactors = FALSE) # geneIDs_miniNCBI_fulldf_namekey.csv
+
+```
+
+## An overview of data processing is as follows:
+1. Read in raw data
+2. Replace names with gene IDS
+3. Create a Seurat object for downstream analyses and data manipulation
+
+# Using a for loop, load in Octo Seq Data and take data through pre-processing steps
+```{r}
+#make empty list for all the seurat objects
+all_list = list() 
+
+#making a hashmap of OctoGenes to fullnames from the seurat namekey
+unclass(by(namekey, namekey$OctoGene, function(x) {
+  tmp <- x$fullname
+  setNames(tmp, x$OctoGene[1])
+  tmp
+  })) -> namekeyDict
+
+#Check that the hashmap is working properly
+print(namekeyDict[["OCTOGene.1"]]) #should print "OG.1"
+print(namekeyDict[["OCTOGene.10032"]]) #should print "NA-Oc29021-OG.100" ; now prints anaphase-promoting-complex-subunit-7-OG10032-OB29021"
+```
+
+```{r}
+ct = 1
+for(f in 1:2){ #New gtf, NextSeq + HiSeq from directory master
+  all <- Read10X(data.dir = data_dir[f+16])
+  ngenes <- length(all@Dimnames[[1]])
+  for (g in 1:ngenes){
+      gene <- all@Dimnames[[1]][g]
+      temp <- namekeyDict[[gene]]
+      if (length(temp) == length(all@Dimnames[[1]][g])){ #This checks that temp is not zero
+         all@Dimnames[[1]][g] <- temp
+         }
+      }
+  all <- CreateSeuratObject(counts = all, project = paste("Run", f, sep = ""), min.cells = 3, min.features = 200)
+  all_list[[ct]] = all
+  ct = ct + 1
+}
+
+saveRDS(all_list, "~/hisatAll_list9120.rds")
+  
+# To access individual objects: all_list[[1]]
+#example: all_list[[1]] will print the object information on Seurat object 1
+```
+
