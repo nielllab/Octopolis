@@ -1,7 +1,7 @@
 ---
 title: "Std_CCA.Rmd"
 author: "jos"
-date: "8/10/2020"
+date: "9/03/2020"
 output: 
   html_document:
     fig_height: 12
@@ -176,7 +176,12 @@ plot2
 
 all <- subset(all, subset = nFeature_RNA > 500 & nFeature_RNA < 7000 & nCount_RNA <30000)
 # eval features after subsetting: 
-# VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
+VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
+
+# subset min.features = 750 
+all <- subset(all, subset = nFeature_RNA > 750 & nFeature_RNA < 7000 & nCount_RNA <30000)
+# eval features after subsetting: 
+VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
 ```
 
 ## Run PCA and generate UMAP
@@ -207,24 +212,15 @@ DimPlot(all, reduction = "umap", label = TRUE)
 DimPlot(all, reduction = "umap", group.by = "orig.ident")
 ```
 
-```{r echo = FALSE, eval = FALSE}
-# subset min.features = 750 (all2)
-all2 <- subset(all, subset = nFeature_RNA > 750 & nFeature_RNA < 7000 & nCount_RNA <30000)
-all2 <- ScaleData(all2)
-all2 <- RunPCA(all2, npcs = PC, verbose = FALSE)
-all2 <- FindNeighbors(all2, dims = DM) 
-all2 <- FindClusters(all2, resolution = 1)
-all2 <- RunUMAP(all2, reduction = "pca", dims = DM)
-DimPlot(all2, reduction = "umap", label = TRUE)
-DimPlot(all2, reduction = "umap", group.by = "orig.ident")
-```
-
-## Build a hierarchical tree
+## Build a hierarchical tree & plot UMAP
 ```{r }
 all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = DM)
 PlotClusterTree(all.tree, label = TRUE)
+all.tree <- FindNeighbors(all.tree, dims = DM) 
+all.tree <- FindClusters(all.tree, resolution = 1)
 all.tree <- RunUMAP(all.tree, dims = DM)
 DimPlot(all.tree, reduction = "umap", label = TRUE)
+DimPlot(all.tree, reduction = "umap", group.by = "orig.ident")
 ```
 
 ## Examine cell-cluster information & cluster features
@@ -243,51 +239,57 @@ VlnPlot(all.tree, features = "nFeature_RNA", y.max = 20000, pt.size = 0, ncol = 
 
 ## ID cluster markers based on dendogram renumbering
 ```{r} 
-# chunk (editing) in progress 9/3/20 12:07am
-# nlevels(all.tree$seurat_clusters)
 markers_list = list()
-for (m in 1:2){
+for (m in 1:nlevels(all.tree$seurat_clusters)){
   markersROC <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
   markersROC <- setNames(cbind(rownames(markersROC), markersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
   markersROC$diff_exp <- (markersROC$pct.1/markersROC$pct.2)
   markersROC <- markersROC[order(-markersROC$diff_exp),]
-  markers_list[[m]] = markersROC
-  markersROC$header[m] <- paste("Cluster", all.tree$seurat_clusters[m], sep = " ")
-  markersROC$top5markers[m] <- paste((head(markersROC[m]$geneID, n = 5)))
+  header <- paste("Cluster", all.tree$seurat_clusters[m], sep = " ")
+  top5markers <- paste((head(markersROC$geneID, n = 5)))
   marker_output <- c(header, top5markers)
   print(marker_output)
-  #topfeatures[[m]] <- head(markers_list[[m]][["geneID"]], n = 5) 
-  #DotPlot(all.tree, features = topfeatures[m]) 
+  markers_list[m] = markersROC
+  #features_df <- data.frame(Col1 = rep(all.tree$seurat_clusters[m], 5), Col2 = top5markers[m]) 
+   #     print(head(features_df))
+    #    features_df.merged <- features_df[m] %>%
+     #       dplyr::group_by(Col1) %>%
+      #      dplyr::summarize(Col2 = paste(features_df$Col2, collapse = ","))
+  #print(head(features_df.merged))
+  #print(DotPlot(all.tree, features = features_df.merged$Col2)+ RotatedAxis()) # can ID which cluster to view genes
 }
+
+# write.csv(markers_list, "/Users/josongco/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/clustermarkers9120.csv") #9120 indicates dataset
 ```
 
 ## ID markers for nodes/connecting points of dendogram
 ```{r}
-# length(nodes)
 nodes <- unique(all.tree@tools$BuildClusterTree$edge[,1])
 node_markers = list()
-for (n in 1:2){
+for (n in 1:length(nodes)){
   nodemarkersROC <- FindMarkers(all.tree, ident.1 = "clustertree", ident.2 = nodes[n], logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
   nodemarkersROC <- setNames(cbind(rownames(nodemarkersROC), nodemarkersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
   nodemarkersROC$diff_exp <- (nodemarkersROC$pct.1/nodemarkersROC$pct.2)
   nodemarkersROC <- nodemarkersROC[order(-nodemarkersROC$diff_exp),]
   node_markers[[n]] = nodemarkersROC
-  
   node_header <- paste("Node", nodes[n], sep = " ")
   top5nodemarkers <- paste(head(nodemarkersROC$geneID, n = 5))
   nodemarker_output <- c(node_header, top5nodemarkers)
   print(nodemarker_output)
-  nodefeatures_df <- data.frame(Col1 = rep(nodes[n], 5), Col2 = top5nodemarkers[n]) 
-        print(head(nodefeatures_df))
-        nodefeatures_df.merged <- nodefeatures_df[n] %>%
-            dplyr::group_by(Col1) %>%
-            dplyr::summarize(Col2 = paste(nodefeatures_df$Col2, collapse = ", "))
-  print(head(nodefeatures_df.merged))
-  #topnodefeatures[[n]] <- head(nodemarkersROC[n]$geneID, n = 5) 
-  #nodefeatures_df <- data.frame(nodes[[2]], (headtopnodefeatures[[2]], n = 5))
-  DotPlot(all.tree, features = nodefeatures_df.merged$Col2)+ RotatedAxis() # can ID which node to view genes
+  
+  # nodefeatures_df <- data.frame(Col1 = rep(nodes[n], 5), Col2 = top5nodemarkers, stringsAsFactors = FALSE) 
+  #print(head(nodefeatures_df))
+   #nodefeatures_df.merged <- nodefeatures_df %>%
+  #    dplyr::group_by(Col1) %>%
+  #    dplyr::summarize(Col2 = paste(nodefeatures_df$Col2, collapse = ","))
+  #      print(head(nodefeatures_df.merged))
+  #node_markers[n] = nodefeatures_df.merged
+  #node_dp <- DotPlot(all.tree, features = nodefeatures_df.merged$Col2)+ RotatedAxis() # unable to find genes
+  #print(node_dp)
 }
 
+
+#write.csv(node_markers, "/Users/josongco/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/nodemarkers9120.csv") #9120 indicates dataset
 ```
 
 ## Plot features
@@ -302,7 +304,7 @@ genelist <- vector()
 nomatch <- list()
 for (i in 1:12){
   gene <- yfg[[i,2]]
-  #gene<-substr(gene,7,str_length(gene)-1)
+  gene<-substr(gene,7,str_length(gene)-1)
   loc <- grep(gene,all.genes)
   if (length(loc)>0) {
     genelist <- c(genelist,loc)
@@ -343,7 +345,8 @@ genelist <- vector()
 nomatch <- list()
 for (i in 1:12){
   gene <- yfg[[i,2]]
-  #gene<-substr(gene,7,str_length(gene)-1)
+  gene<-substr(gene,10,str_length(gene))
+  gene<- paste("OB", gene, sep = "")
   loc <- grep(gene,all.genes)
   if (length(loc)>0) {
     genelist <- c(genelist,loc)
@@ -353,11 +356,11 @@ for (i in 1:12){
 }
 
 # hisat file was not able to find the following: 
-# "Ocbimv22021175" = synaptotagmin OCTOGene.20163
+# "Ocbimv22021175" = synaptotagmin OG.20163
 # "Ocbimv22024718" = VGlut 
-# "Ocbimv22017369" = TH OCTOGene.16681
-# "Ocbimv22001324" = FMRF-amide OCTOGene.28623
-# "Ocbimv22031264" = TyrBH OCTOGene.41051
+# "Ocbimv22017369" = TH OG.16681
+# "Ocbimv22001324" = FMRF-amide OG.28623
+# "Ocbimv22031264" = TyrBH OG.41051
 
 DefaultAssay(all.tree) <- "RNA"
 
@@ -367,11 +370,11 @@ DotPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051")) 
 FeaturePlot(all.tree, features = all.genes[genelist[1:2]], ncol = 1) + NoLegend() + NoAxes() 
 FeaturePlot(all.tree, features = all.genes[genelist[3:4]], ncol = 1) + NoLegend() + NoAxes()
 FeaturePlot(all.tree, features = all.genes[genelist[5:7]], ncol = 1) + NoLegend() + NoAxes()
-FeaturePlot(all.tree, features = c("OCTOGene.20163", "OCTOGene.16681", "OCTOGene.28623", "OCTOGene.41051"), ncol = 1)
+FeaturePlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051"), ncol = 1)
 
 VlnPlot(all.tree, features = all.genes[genelist[1:4]], ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
 VlnPlot(all.tree, features = all.genes[genelist[5:7]], ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
-VlnPlot(all.tree, features = c("OCTOGene.20163", "OCTOGene.16681", "OCTOGene.28623", "OCTOGene.41051"), pt.size = 0, ncol = 1)
+VlnPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051"), pt.size = 0, ncol = 1)
 
 #grep("glut",all.genes)
  #[1]  2034  4008  4599 10227 12291 14312 18187 19855 19948 27719 32028 40993 41561
