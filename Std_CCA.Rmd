@@ -173,11 +173,17 @@ plot2 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
 # visualize the relationship between genes (ID as >1 UMI) and mitochondrial genes
 #plot1 + plot2
 plot2
+```
 
+## Subset nFeature > 500
+```{r}
 all <- subset(all, subset = nFeature_RNA > 500 & nFeature_RNA < 7000 & nCount_RNA <30000)
 # eval features after subsetting: 
 VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
+```
 
+## Subset nFeature > 750
+```{r}
 # subset min.features = 750 
 all <- subset(all, subset = nFeature_RNA > 750 & nFeature_RNA < 7000 & nCount_RNA <30000)
 # eval features after subsetting: 
