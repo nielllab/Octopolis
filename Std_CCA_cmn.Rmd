@@ -287,8 +287,8 @@ VlnPlot(all.tree, features = "nFeature_RNA", y.max = 7500, pt.size = 0, ncol = 1
 ```
 
 ## ID cluster markers based on dendogram renumbering
-```{r, echo = TRUE, eval = FALSE} 
-# error: Cannot find the following identities in the object: 43
+```{r} 
+
 markers_list = list()
 for (m in 1:nlevels((all.tree$seurat_clusters))){
 #for (m in 1:3){
@@ -299,7 +299,7 @@ for (m in 1:nlevels((all.tree$seurat_clusters))){
   header <- paste("Cluster", m, sep = " ")
   top50markers <- paste((head(markersROC$geneID, n = 50)))
   marker_output <- c(header, top50markers)
-  print(marker_output)
+  print(markersROC)
   markers_list[m] = markersROC
   
   p<-DotPlot(all.tree,features=rev(head(markersROC$geneID,50))) + RotatedAxis()
@@ -320,9 +320,8 @@ print(p)
 ```
 
 ## ID markers for nodes/connecting points of dendogram
-```{r echo = TRUE, eval = FALSE}
-# error: Error in WhichCells.Seurat(object = object, idents = ident.2) : 
-  # continued Cannot find the following identities in the object: 43
+```{r eval = FALSE }
+# works but sometimes crashes - too big?
 print(PlotClusterTree(all.tree, label = TRUE))
 
 nodes <- unique(all.tree@tools$BuildClusterTree$edge[,1])
@@ -337,7 +336,7 @@ for (n in 1:length(nodes)){
   rightMarkers <- nodemarkersROC[nodemarkersROC$avg_diff<0,]
   rightMarkers <- rightMarkers[order(-rightMarkers$power),]
   
-  leftrightMarkers = rbind(head(leftMarkers,50),head(rightMarkers,50))
+  leftrightMarkers = rbind(head(leftMarkers,25),head(rightMarkers,25))
   nodemarkersROC <- nodemarkersROC[order(-nodemarkersROC$power),]
   node_markers[[n]] = leftrightMarkers
   node_header <- paste("Node", nodes[n], sep = " ")
