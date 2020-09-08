@@ -301,9 +301,9 @@ for (m in 1:nlevels((all.tree$seurat_clusters))){
   print(markersROC)
   markers_list[m] = markersROC
   
-  p<-DotPlot(all.tree,features=rev(head(markersROC$geneID,50))) + RotatedAxis()
-p<- trimLabelsX(p,20)
-print(p)
+  #p<-DotPlot(all.tree,features=rev(head(markersROC$geneID,50))) + RotatedAxis()
+#p<- trimLabelsX(p,20)
+#print(p)
 
 
   #features_df <- data.frame(Col1 = rep(all.tree$seurat_clusters[m], 5), Col2 = top5markers[m]) 
@@ -347,10 +347,10 @@ for (n in 1:length(nodes)){
 #p<- trimLabelsX(p,20)
 #print(p)
 
-  p<-DotPlot(all.tree,features=rev(leftrightMarkers$geneID)) + RotatedAxis()
-p<- trimLabelsX(p,20)
-p<-p + labs(title = node_header)
-print(p)
+  #p<-DotPlot(all.tree,features=rev(leftrightMarkers$geneID)) + RotatedAxis()
+#p<- trimLabelsX(p,20)
+#p<-p + labs(title = node_header)
+#print(p)
 
 
 }
