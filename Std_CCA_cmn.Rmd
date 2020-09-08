@@ -341,7 +341,7 @@ for (n in 1:length(nodes)){
   node_header <- paste("Node", nodes[n], sep = " ")
   top50nodemarkers <- paste(head(nodemarkersROC$geneID, n = 50))
   nodemarker_output <- c(node_header, top50nodemarkers)
- # print(nodemarker_output)
+ print(nodemarker_output)
   
  # p<-DotPlot(all.tree,features=rev(head(markersROC$geneID,50))) + RotatedAxis()
 #p<- trimLabelsX(p,20)
