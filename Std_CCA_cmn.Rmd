@@ -198,8 +198,8 @@ trimTitle <- function(p,len){
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqTrimStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombinedStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiseqCombinedStd_str8.rds")
-#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds")
-all <- readRDS("D:/data/octo seq/Hisat_HiSeqCombined9120StdCCA.rds")
+all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds")
+#all <- readRDS("D:/data/octo seq/Hisat_HiSeqCombined9120StdCCA.rds")
 
 DefaultAssay(all) <- "integrated" #omit if using straight merge
 ```
@@ -291,7 +291,6 @@ VlnPlot(all.tree, features = "nFeature_RNA", y.max = 7500, pt.size = 0, ncol = 1
 
 markers_list = list()
 for (m in 1:nlevels((all.tree$seurat_clusters))){
-#for (m in 1:3){
   markersROC <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.5, test.use = "roc", only.pos = TRUE)
   markersROC <- setNames(cbind(rownames(markersROC), markersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
   markersROC$diff_exp <- (markersROC$pct.1/markersROC$pct.2)
@@ -400,7 +399,7 @@ genelist <- findGenes(yfg[1:12,2],all.genes)
 
 # hisat file was not able to find the following: 
 # "Ocbimv22021175" = synaptotagmin OG.20163
-# "Ocbimv22024718" = VGlut 
+# "Ocbimv22024718" = VGlut OG.8038
 # "Ocbimv22017369" = TH OG.16681
 # "Ocbimv22001324" = FMRF-amide OG.28623
 # "Ocbimv22031264" = TyrBH OG.41051
@@ -427,12 +426,12 @@ for (i in 1:length(genelist)){
 }
 
 #dotplot of some selected genes
-DotPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051")) #synaptotagmin, TH, FMRF-amide, TyrBH)
+DotPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038")) #synaptotagmin, TH, FMRF-amide, TyrBH, VGlut)
 
-FeaturePlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051"), ncol = 1)
+FeaturePlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038"), ncol = 1)
 
 
-VlnPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051"), pt.size = 0, ncol = 1)
+VlnPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038"), pt.size = 0, ncol = 1)
 
 #grep("glut",all.genes)
  #[1]  2034  4008  4599 10227 12291 14312 18187 19855 19948 27719 32028 40993 41561
