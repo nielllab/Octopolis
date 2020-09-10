@@ -67,12 +67,13 @@ all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeq_hisat.rds") #HiS
 all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqTrim_hisat.RDS") #HiSeqTrim
 all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqCombined_hisat.rds") #HiSeqCombined
 all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/hisatAll_list9120.rds") #HiSeqCombined updated gene names 09/01/2020
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/hisatAll_list9320.rds") #HiSeqCombined updated gene names 09/03/2020
 
 
 for (i in 1:length(all_list)){
   #all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command
    all_list[[i]] <- NormalizeData(all_list[[i]])
-   all_list[[i]] <- FindVariableFeatures(all_list[[i]], selection.method = "vst") #omit nfeatures = 2000 for 9120 dataset
+   all_list[[i]] <- FindVariableFeatures(all_list[[i]], selection.method = "vst") #omit nfeatures = 2000 for 9120, 9320 dataset
 }
 
 saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/Hisat_allStd.rds") # not necessary for HiSeq data
@@ -81,7 +82,7 @@ saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/Hisat_allStd.rds") # not
 all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_allStd.rds") # not necessary for HiSeq data
 
 ## Identify anchors and integrate datasets.
-all.anchors <- FindIntegrationAnchors(object.list = all_list, anchor.features = 2000, verbose = TRUE) # can omit dims = 1:30 but takes a really long time to run; determine if want to keep anchor.features = 2000; omit ndims for 9120 data
+all.anchors <- FindIntegrationAnchors(object.list = all_list, anchor.features = 2000, verbose = TRUE) # can omit dims = 1:30 but takes a really long time to run; determine if want to keep anchor.features = 2000; omit ndims for 9120, 9320 data
 allnorm.integrated <- IntegrateData(anchorset = all.anchors, verbose = TRUE)
 
 saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_allStdCCA.rds")
@@ -89,6 +90,7 @@ saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqStd
 saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqTrimStdCCA.rds")
 saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombinedStdCCA.rds")
 saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds") #omit nfeatures = 2000, ndims = 1:30 for 9120 dataset
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9320StdCCA.rds") #omit nfeatures = 2000, ndims = 1:30 for 9320 dataset
 
 ###### v3 dataset
 ## Identify anchors and integrate datasets. 
@@ -158,6 +160,7 @@ trimLabelsX <- function(p,len){
   oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x.labels
   newxlabels = oldxlabels
   for (i in 1:length(oldxlabels)){
+    i
     newxlabels[[i]] =  substr(oldxlabels[[i]],1,len)
   }
  p<- p + scale_x_discrete(labels = newxlabels)
@@ -199,6 +202,7 @@ trimTitle <- function(p,len){
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombinedStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiseqCombinedStd_str8.rds")
 all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds")
+all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9320StdCCA.rds")
 #all <- readRDS("D:/data/octo seq/Hisat_HiSeqCombined9120StdCCA.rds")
 
 DefaultAssay(all) <- "integrated" #omit if using straight merge
@@ -301,9 +305,9 @@ for (m in 1:nlevels((all.tree$seurat_clusters))){
   print(markersROC)
   markers_list[m] = markersROC
   
-  #p<-DotPlot(all.tree,features=rev(head(markersROC$geneID,50))) + RotatedAxis()
-#p<- trimLabelsX(p,20)
-#print(p)
+  p<-DotPlot(all.tree,features=rev(head(markersROC$geneID,50))) + RotatedAxis()
+p<- trimLabelsX(p,20)
+print(p)
 
 
   #features_df <- data.frame(Col1 = rep(all.tree$seurat_clusters[m], 5), Col2 = top5markers[m]) 
@@ -343,14 +347,14 @@ for (n in 1:length(nodes)){
   nodemarker_output <- c(node_header, top50nodemarkers)
  print(nodemarker_output)
   
- # p<-DotPlot(all.tree,features=rev(head(markersROC$geneID,50))) + RotatedAxis()
+  p<-DotPlot(all.tree,features=rev(head(markersROC$geneID,50))) + RotatedAxis()
 #p<- trimLabelsX(p,20)
-#print(p)
+print(p)
 
-  #p<-DotPlot(all.tree,features=rev(leftrightMarkers$geneID)) + RotatedAxis()
+  p<-DotPlot(all.tree,features=rev(leftrightMarkers$geneID)) + RotatedAxis()
 #p<- trimLabelsX(p,20)
-#p<-p + labs(title = node_header)
-#print(p)
+p<-p + labs(title = node_header)
+print(p)
 
 
 }
@@ -388,9 +392,9 @@ findGenes <- function(yfg,allgenes) {
 ## USE ME
 #### change eval = FALSE when using Orig GTF
 
-#yfg <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
+yfg <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
 
-yfg <- read.csv("D:/data/octo seq/Genes for in situ.csv",stringsAsFactors=FALSE)
+#yfg <- read.csv("D:/data/octo seq/Genes for in situ.csv",stringsAsFactors=FALSE)
 
 # find match for yfg and all gene names
 
@@ -408,7 +412,7 @@ DefaultAssay(all.tree) <- "RNA"
 
 # dotplot of all genes from list
 p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()
-p<- trimLabelsX(p,20)
+#p<- trimLabelsX(p,20)
 print(p)
 
 # featureplot of all genes in list
@@ -426,12 +430,12 @@ for (i in 1:length(genelist)){
 }
 
 #dotplot of some selected genes
-DotPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038")) #synaptotagmin, TH, FMRF-amide, TyrBH, VGlut)
+#DotPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038")) #synaptotagmin, TH, FMRF-amide, TyrBH, VGlut)
 
-FeaturePlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038"), ncol = 1)
+#FeaturePlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038"), ncol = 1)
 
 
-VlnPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038"), pt.size = 0, ncol = 1)
+#VlnPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038"), pt.size = 0, ncol = 1)
 
 #grep("glut",all.genes)
  #[1]  2034  4008  4599 10227 12291 14312 18187 19855 19948 27719 32028 40993 41561
@@ -448,7 +452,7 @@ VlnPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "
 
 ```{r echo = FALSE, eval = FALSE}
 # grep for genes
-genelist = grep("synaptotagmin",all.genes, ignore.case = TRUE)
+genelist = grep("VGlut",all.genes, ignore.case = TRUE)
 
 # dotplot
 p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()
