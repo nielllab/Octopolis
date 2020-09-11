@@ -15,6 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r, echo = FALSE}
 # to knit document, use the following command: rmarkdown::render("/Users/josongco/GitHub/Octopolis/Std_CCA.Rmd") ~30m [rename file when saved so code doesn't overwrite while producing next html]
 
+
 library(Seurat)
 library(Matrix)
 library(ggplot2)
@@ -23,6 +24,7 @@ library(stringr)
 library(cowplot) # used for CCA
 library(patchwork) # used for CCA
 library(dplyr) # used for print markers
+
 ```
 
 ```{r, echo = FALSE, eval = FALSE} 
@@ -155,7 +157,10 @@ DMset = 30
 # trim labels on x-axis
 trimLabelsX <- function(p,len){
   pp<- ggplot_build(p)
-  oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x.labels
+  oldxlabels = pp$layout$panel_params[[1]]$x.labels
+  if (length(oldxlabels)==0){
+  oldxlabels = pp$layout$panel_params[[1]]$x$breaks
+  }
   newxlabels = oldxlabels
   for (i in 1:length(oldxlabels)){
     newxlabels[[i]] =  substr(oldxlabels[[i]],1,len)
@@ -168,6 +173,9 @@ trimLabelsY <- function(p,len){
   pp<- ggplot_build(p)
   
   oldylabels = ggplot_build(p)$layout$panel_params[[1]]$y.labels
+    if (length(oldylabels)==0){
+  oldylabels = pp$layout$panel_params[[1]]$y$breaks
+  }
   newylabels = oldylabels
 for (i in 1:length(oldylabels)){
     newylabels[[i]] =  substr(oldylabels[[i]],1,len)
@@ -198,8 +206,8 @@ trimTitle <- function(p,len){
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqTrimStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombinedStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiseqCombinedStd_str8.rds")
-all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds")
-#all <- readRDS("D:/data/octo seq/Hisat_HiSeqCombined9120StdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds")
+all <- readRDS("~/Hisat_HiSeqCombined9120StdCCA.rds")
 
 DefaultAssay(all) <- "integrated" #omit if using straight merge
 ```
@@ -301,9 +309,9 @@ for (m in 1:nlevels((all.tree$seurat_clusters))){
   print(markersROC)
   markers_list[m] = markersROC
   
-  #p<-DotPlot(all.tree,features=rev(head(markersROC$geneID,50))) + RotatedAxis()
-#p<- trimLabelsX(p,20)
-#print(p)
+  p<-DotPlot(all.tree,features=rev(head(markersROC$geneID,50))) + RotatedAxis()
+p<- trimLabelsX(p,20)
+print(p)
 
 
   #features_df <- data.frame(Col1 = rep(all.tree$seurat_clusters[m], 5), Col2 = top5markers[m]) 
