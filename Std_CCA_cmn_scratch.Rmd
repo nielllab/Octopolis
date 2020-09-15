@@ -209,7 +209,7 @@ trimTitle <- function(p,len){
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqTrimStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombinedStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiseqCombinedStd_str8.rds")
-#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds")
+all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds")
 all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9320StdCCA.rds")
 #all <- readRDS("D:/data/octo seq/Hisat_HiSeqCombined9120StdCCA.rds")
 
@@ -239,19 +239,17 @@ VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
 # subset min.features = 750 
 all <- subset(all, subset = nFeature_RNA > 750 & nFeature_RNA < 7000 & nCount_RNA <30000)
 # eval features after subsetting: 
-VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, y.max = 30000) + NoLegend() 
-#VlnPlot(all, features = c("nCount_RNA"), pt.size = 0, y.max = 30000) + NoLegend() 
-#VlnPlot(all, features = c("nFeature_RNA"), pt.size = 0, y.max = 7500) + NoLegend()
+VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
 ```
 
 ## Run PCA and generate UMAP
 ```{r }
 all <- ScaleData(all)
 all <- RunPCA(all, npcs = PC, verbose = FALSE)
-for (i in 1:30){ 
-p<-DimHeatmap(all, dims = i, cells = 500, balanced = TRUE)
-print(p)
-}
+#for (i in 1:30){ 
+#p<-DimHeatmap(all,dims = i, cells = 500, balanced = TRUE, nfeatures = 50)
+#print(p)
+#}
 #DimHeatmap(all, dims = 1:5, cells = 500, balanced = TRUE)
 #DimHeatmap(all, dims = 6:10, cells = 500, balanced = TRUE)
 #DimHeatmap(all, dims = 11:15, cells = 500, balanced = TRUE)
@@ -260,6 +258,14 @@ print(p)
 #DimHeatmap(all, dims = 26:30, cells = 500, balanced = TRUE)
 
 ElbowPlot(all, ndims = DMset)
+
+for (i in 1:30){
+p<-VizDimLoadings(all, dims = i, reduction = "pca", nfeatures = 30)
+p<-trimLabelsY(p,30)
+print(p)
+}
+
+
 
 #all <- JackStraw(all, dims = DMset) # dims max depends on how many pcs originally calculated
 #all <- ScoreJackStraw(all, dims = DM)
@@ -284,6 +290,11 @@ PlotClusterTree(all.tree, label = TRUE)
 #all.tree <- RunUMAP(all.tree, dims = DM)
 DimPlot(all.tree, reduction = "umap", label = TRUE)
 DimPlot(all.tree, reduction = "umap", group.by = "orig.ident")
+```
+```{r}
+for (i in 0:14){
+  print(DimPlot(all,reduction = "pca",dims = c(2*i+1,2*i+2),label=TRUE))
+}
 ```
 
 ## Examine cell-cluster information & cluster features
@@ -385,7 +396,7 @@ findGenes <- function(yfg,allgenes) {
   nomatch <- list()
   for (i in 1:length(yfg)){
     gene <- yfg[[i]]
-    gene<-substr(gene,10,str_length(gene))
+    gene<-substr(gene,10,str_length(gene)-1)
     gene<- paste("OB", gene, sep = "")
     loc <- grep(gene,allgenes)
     # check that there was one identified, and that the gene wasn't empty (will be OB and match everything!)
@@ -395,6 +406,7 @@ findGenes <- function(yfg,allgenes) {
       nomatch <- c(nomatch,yfg[[i]])
     }
   }
+  print(nomatch)
   return(genelist)
 }
 
@@ -404,13 +416,13 @@ findGenes <- function(yfg,allgenes) {
 ## USE ME
 #### change eval = FALSE when using Orig GTF
 
-yfg <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
+#yfg <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
 
-#yfg <- read.csv("D:/data/octo seq/Genes for in situ.csv",stringsAsFactors=FALSE)
+yfg <- read.csv("D:/data/octo seq/Genes for in situ.csv",stringsAsFactors=FALSE)
 
 # find match for yfg and all gene names
 
-genelist <- findGenes(yfg[1:12,2],all.genes)
+genelist <- findGenes(yfg[1:22,2],all.genes)
 
 
 # hisat file was not able to find the following: 
@@ -424,7 +436,7 @@ DefaultAssay(all.tree) <- "RNA"
 
 # dotplot of all genes from list
 p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()
-#p<- trimLabelsX(p,20)
+p<- trimLabelsX(p,20)
 print(p)
 
 # featureplot of all genes in list
@@ -445,7 +457,6 @@ for (i in 1:length(genelist)){
 #DotPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038")) #synaptotagmin, TH, FMRF-amide, TyrBH, VGlut)
 
 #FeaturePlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038"), ncol = 1)
-#FeaturePlot(all.tree, features = ("VACHT"))
 
 
 #VlnPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038"), pt.size = 0, ncol = 1)
@@ -459,9 +470,9 @@ for (i in 1:length(genelist)){
 
 # Can also use line of code below to find candidate gene 
 #FeaturePlot(all.tree,features = all.genes[grep("VGlut",all.genes)])
-#FeaturePlot(all.tree,features = all.genes[grep("glut",all.genes)]) * use this one!!
+#FeaturePlot(all.tree,features = all.genes[grep("glut",all.genes)]) * use this one
 #
-#1synaptotagmin	Ocbimv22021175	NA	neurons	NA	G
+#synaptotagmin	Ocbimv22021175	NA	neurons	NA	G
 #2	VAchT	Ocbimv22001681	NA	cholinergic neurons	NA	R
 #3	ChaT	Ocbimv22001674	NA	cholinergic neurons	NA	G
 #4	VGlut	Ocbimv22024718	NA	glutamatergic neurons	NA	R ------
@@ -473,14 +484,14 @@ for (i in 1:length(genelist)){
 #10	TyrBH	Ocbimv22031264	NA	Octopamine	NA	R
 #11	AchE	Ocbimv22038398	NA	glia?	NA	R
 #12	GAD
-#FeaturePlot(all.tree,features = all.genes[grep("03827",all.genes)]) 
 ```
 
 
 ```{r echo = FALSE, eval = FALSE}
 # grep for genes
-genelist = grep("VGlut",all.genes, ignore.case = TRUE)
-
+mygenes = c("OG12195","OG41780","OG68728","OG8891","OG61290","vasopressin")
+for (i in 1:length(mygenes)){
+genelist = grep(mygenes[i],all.genes)
 # dotplot
 p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()
 p<- trimLabelsX(p,20)
@@ -494,10 +505,38 @@ for (i in 1:length(genelist)){
   print(p)
 }
 
+}
 ```
 
 
 
 ```{r}
+FeaturePlot(all.tree, features = c("nFeature_RNA", "nCount_RNA"))
+```
+
+```{r}
+DefaultAssay(all.tree) <- "RNA"
+yfg <- read.csv("D:/data/octo seq/GeneIDs - Cadherins.csv",stringsAsFactors=FALSE)
+
+genelist <- findGenes(yfg[,1],all.genes)
+genelist <- unique(genelist)
+# dotplot of all genes from list
+p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+p<- trimLabelsX(p,20)
+print(p)
+
 
 ```
+
+```{r}
+DefaultAssay(all.tree) <- "RNA"
+yfg <- read.csv("D:/data/octo seq/GeneIDs - NP Corr.csv",stringsAsFactors=FALSE)
+
+genelist <- findGenes(yfg[,1],all.genes)
+genelist <- unique(genelist)
+# dotplot of all genes from list
+p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 8))
+p<- trimLabelsX(p,100)
+print(p)
+```
+
