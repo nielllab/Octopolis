@@ -201,7 +201,7 @@ trimTitle <- function(p,len){
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqTrimStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombinedStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiseqCombinedStd_str8.rds")
-all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds")
 all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9320StdCCA.rds")
 #all <- readRDS("D:/data/octo seq/Hisat_HiSeqCombined9120StdCCA.rds")
 
@@ -231,7 +231,9 @@ VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
 # subset min.features = 750 
 all <- subset(all, subset = nFeature_RNA > 750 & nFeature_RNA < 7000 & nCount_RNA <30000)
 # eval features after subsetting: 
-VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
+VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, y.max = 30000) + NoLegend() 
+#VlnPlot(all, features = c("nCount_RNA"), pt.size = 0, y.max = 30000) + NoLegend() 
+#VlnPlot(all, features = c("nFeature_RNA"), pt.size = 0, y.max = 7500) + NoLegend()
 ```
 
 ## Run PCA and generate UMAP
@@ -286,6 +288,8 @@ id_runs <- table(all.tree$orig.ident, Idents(all.tree))
 #barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "palegreen3", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # all runs
 barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # v3 chem
 
+plot(id_runs[1,],id_runs[2,],xlab = "Run 1",ylab="Run 2")
+
 VlnPlot(all.tree, features = "nCount_RNA", y.max = 20000, pt.size = 0, ncol = 1)
 VlnPlot(all.tree, features = "nFeature_RNA", y.max = 7500, pt.size = 0, ncol = 1)
 ```
@@ -306,7 +310,7 @@ for (m in 1:nlevels((all.tree$seurat_clusters))){
   markers_list[m] = markersROC
   
   p<-DotPlot(all.tree,features=rev(head(markersROC$geneID,50))) + RotatedAxis()
-#p<- trimLabelsX(p,20)
+p<- trimLabelsX(p,20)
 print(p)
 
 
@@ -433,6 +437,7 @@ for (i in 1:length(genelist)){
 #DotPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038")) #synaptotagmin, TH, FMRF-amide, TyrBH, VGlut)
 
 #FeaturePlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038"), ncol = 1)
+#FeaturePlot(all.tree, features = ("VACHT"))
 
 
 #VlnPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038"), pt.size = 0, ncol = 1)
@@ -446,20 +451,21 @@ for (i in 1:length(genelist)){
 
 # Can also use line of code below to find candidate gene 
 #FeaturePlot(all.tree,features = all.genes[grep("VGlut",all.genes)])
-#FeaturePlot(all.tree,features = all.genes[grep("glut",all.genes)]) * use this one
+#FeaturePlot(all.tree,features = all.genes[grep("glut",all.genes)]) * use this one!!
 #
-#synaptotagmin	Ocbimv22021175	NA	neurons	NA	G
-2	VAchT	Ocbimv22001681	NA	cholinergic neurons	NA	R
-3	ChaT	Ocbimv22001674	NA	cholinergic neurons	NA	G
-4	VGlut	Ocbimv22024718	NA	glutamatergic neurons	NA	R ------
-5	TH	Ocbimv22017369	NA	dopaminergic neurons (and pigment?)	NA	R
-6	DAT	Ocbimv22026818	NA	just dopaminergic?	NA	G
-7	VMAT-A	Ocbimv22031489	NA	monoamine transporter	NA	G ------
-8	FMRF-related peptide	Ocbimv22023842	NA	peptide transmission	NA	R
-9	FMRF-amide	Ocbimv22001324	NA	distinct from FRMF-related peptide	NA	R
-10	TyrBH	Ocbimv22031264	NA	Octopamine	NA	R
-11	AchE	Ocbimv22038398	NA	glia?	NA	R
-12	GAD
+#1synaptotagmin	Ocbimv22021175	NA	neurons	NA	G
+#2	VAchT	Ocbimv22001681	NA	cholinergic neurons	NA	R
+#3	ChaT	Ocbimv22001674	NA	cholinergic neurons	NA	G
+#4	VGlut	Ocbimv22024718	NA	glutamatergic neurons	NA	R ------
+#5	TH	Ocbimv22017369	NA	dopaminergic neurons (and pigment?)	NA	R
+#6	DAT	Ocbimv22026818	NA	just dopaminergic?	NA	G
+#7	VMAT-A	Ocbimv22031489	NA	monoamine transporter	NA	G ------
+#8	FMRF-related peptide	Ocbimv22023842	NA	peptide transmission	NA	R
+#9	FMRF-amide	Ocbimv22001324	NA	distinct from FRMF-related peptide	NA	R
+#10	TyrBH	Ocbimv22031264	NA	Octopamine	NA	R
+#11	AchE	Ocbimv22038398	NA	glia?	NA	R
+#12	GAD
+#FeaturePlot(all.tree,features = all.genes[grep("03827",all.genes)]) 
 ```
 
 
