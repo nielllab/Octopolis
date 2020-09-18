@@ -51,7 +51,7 @@ datafiles <- read.csv("directoryMaster_070720.csv", stringsAsFactors = FALSE)
 data_dir <- as.vector(datafiles$Directory)
 # read in csv namekey
 namekey <- read.csv("fulldf_namekey.csv", stringsAsFactors = FALSE) # geneIDs_miniNCBI_fulldf_namekey.csv (9120)
-# "~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/geneIDs_miniNCBI_fulldf_namekey_Sep3.csv" (9320)
+# "~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/geneIDs_miniNCBI_fulldf_namekey_Sep13.csv" (91320)
 # 
 
 
@@ -75,7 +75,7 @@ unclass(by(namekey, namekey$OctoGene, function(x) {
   })) -> namekeyDict
 
 #Check that the hashmap is working properly
-print(namekeyDict[["OCTOGene.1"]]) #should print "OG.1" ; now prints NA-OG.1
+print(namekeyDict[["OCTOGene.1"]]) #should print "OG.1" ; now prints NA-OG1
 print(namekeyDict[["OCTOGene.10032"]]) #should print "NA-Oc29021-OG.100" ;now prints "anaphase-promoting-complex-subunit-7-OG10032-OB20676-OB29021"
 ```
 
@@ -91,14 +91,13 @@ for(f in 1:2){ #New gtf, NextSeq + HiSeq from directory master
          all@Dimnames[[1]][g] <- temp
          }
       }
-  all <- CreateSeuratObject(counts = all, project = paste("Run", f, sep = ""), min.cells = 3, min.features = 500)
+  all <- CreateSeuratObject(counts = all, project = paste("Run", f, sep = ""), min.cells = 3, min.features = 750)
   all_list[[ct]] = all
   ct = ct + 1
 }
 
-# error: Error in namekeyDict[[gene]] : subscript out of bounds
 
-saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/hisatAll_list9320.rds")
+saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/hisatAll_list91320.rds")
   
 # To access individual objects: all_list[[1]]
 #example: all_list[[1]] will print the object information on Seurat object 1
