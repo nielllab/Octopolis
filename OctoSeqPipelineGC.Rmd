@@ -42,18 +42,28 @@ library(sctransform)
 library(stringr)
 ```
 
+## Set pathway
+```{r}
+# change depending on user
+user = "mea"
+if (user == "mea"){
+  directoryMaster = "~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/directoryMaster_070720.csv"
+  full_namekey = "~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/geneIDs_miniNCBI_fulldf_namekey_Sep18_2.csv"
+} else if (user == "gabby"){
+  directoryMaster = "directoryMaster_070720.csv"
+  full_namekey = "fulldf_namekey.csv"
+}
+```
+
+
 ## Read in files
 ```{r}
 # read in csv with the directories
-datafiles <- read.csv("directoryMaster_070720.csv", stringsAsFactors = FALSE) 
-# mea directory pathway: "~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/directoryMaster_070720.csv"
-#str(datafiles) # view the structure of the data frame
+datafiles <- read.csv(directoryMaster, stringsAsFactors = FALSE) 
 data_dir <- as.vector(datafiles$Directory)
-# read in csv namekey
-namekey <- read.csv("fulldf_namekey.csv", stringsAsFactors = FALSE) # geneIDs_miniNCBI_fulldf_namekey.csv (9120)
-# "~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/geneIDs_miniNCBI_fulldf_namekey_Sep13.csv" (91320)
-# 
 
+# read in csv namekey
+namekey <- read.csv(full_namekey, stringsAsFactors = FALSE)
 
 ```
 
@@ -75,29 +85,33 @@ unclass(by(namekey, namekey$OctoGene, function(x) {
   })) -> namekeyDict
 
 #Check that the hashmap is working properly
-print(namekeyDict[["OCTOGene.1"]]) #should print "OG.1" ; now prints NA-OG1
-print(namekeyDict[["OCTOGene.10032"]]) #should print "NA-Oc29021-OG.100" ;now prints "anaphase-promoting-complex-subunit-7-OG10032-OB20676-OB29021"
+print(namekeyDict[["OCTOGene.1"]]) #should print "NA-OG1"
+print(namekeyDict[["OCTOGene.10032"]]) #should print "anaphase-promoting-complex-subunit-7-OG10032-OB20676-OB29021"
 ```
 
 ```{r}
 ct = 1
 for(f in 1:2){ #New gtf, NextSeq + HiSeq from directory master
   all <- Read10X(data.dir = data_dir[f+16])
-  ngenes <- length(all@Dimnames[[1]])
-  for (g in 1:ngenes){
-      gene <- all@Dimnames[[1]][g]
-      temp <- namekeyDict[[gene]]
-      if (length(temp) == length(all@Dimnames[[1]][g])){ #This checks that temp is not zero
-         all@Dimnames[[1]][g] <- temp
-         }
-      }
+  #ngenes <- length(all@Dimnames[[1]])
+  #for (g in 1:ngenes){
+   #   gene <- all@Dimnames[[1]][g]
+   #   temp <- namekeyDict[[gene]]
+    #  if (length(temp) == length(all@Dimnames[[1]][g])){ #This checks that temp is not zero
+     #    all@Dimnames[[1]][g] <- temp
+      #   }
+      # }
   all <- CreateSeuratObject(counts = all, project = paste("Run", f, sep = ""), min.cells = 3, min.features = 750)
   all_list[[ct]] = all
   ct = ct + 1
 }
 
+# Check that all names were replaced correctly
+grep("VGlut",all_list[[1]]@assays[["RNA"]]@data@Dimnames[[1]], ignore.case = TRUE) # prints [1] 2646 5437
+# double check that this is the right gene that you were looking for
+all_list[[1]]@assays[["RNA"]]@data@Dimnames[[1]][5437] # prints "VGlut-Major-Facilitator-Superfamily-solute-carrier-family-17-sodium-dependent-inorganic-phosphate-cotransporter-member-6-OG8038-OB24718"
 
-saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/hisatAll_list91320.rds")
+saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/hisatAll_list_nonames.rds") #change depending on dataset
   
 # To access individual objects: all_list[[1]]
 #example: all_list[[1]] will print the object information on Seurat object 1

@@ -1,0 +1,399 @@
+---
+title: "SCTransform Normalization of HiSeq with updated names 09/18/20"
+author: "jos"
+date: "09/19/2020"
+output:
+  html_document:
+    fig_height: 12
+    fig_width: 17
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = FALSE}
+# to knit document, use the following command: rmarkdown::render("/Users/josongco/Desktop/FinalSeqData/scT_CCA.Rmd") ~30m [rename file when saved so code doesn't overwrite while producing next html]
+
+library(Seurat)
+library(Matrix)
+library(ggplot2)
+library(sctransform)
+library(stringr)
+library(cowplot) # used for CCA
+library(patchwork) # used for CCA
+```
+
+```{r, echo = FALSE, eval = FALSE} 
+##### ORIG GTF
+all_list <- readRDS("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/all_list.rds")
+for (i in 1:length(all_list)){
+  #all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command
+  all_list[[i]] <- SCTransform(all_list[[i]], verbose = FALSE)
+}
+
+saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/allscT.rds")
+
+
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/allscT.rds")
+
+## Select features for downstream integration, and run PrepSCTIntegration so that all necessary Pearson residuals have been calculated
+all.features <- SelectIntegrationFeatures(object.list = all_list, nfeatures = 2000) #paper uses 3000 as default but chose to use 2000 like other dataset integration
+all_list <- PrepSCTIntegration(object.list = all_list, anchor.features = all.features, verbose = TRUE)
+
+## Identify anchors and integrate datasets. Use the standard workflow, with the exception that normalization.method = 'SCT'
+all.anchors <- FindIntegrationAnchors(object.list = all_list, normalization.method = "SCT", 
+    anchor.features = all.features, dims = 1:30, verbose = TRUE) # can omit dims but takes a really long time to run
+allnorm.integrated <- IntegrateData(anchorset = all.anchors, normalization.method = "SCT", 
+    verbose = TRUE)
+
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/allscTCCA.rds")
+
+###### v3 dataset
+all.features <- SelectIntegrationFeatures(object.list = all_list[2:3], nfeatures = 2000) #paper uses 3000 as default but chose to use 2000 like other dataset integration
+all_list <- PrepSCTIntegration(object.list = all_list[2:3], anchor.features = all.features, verbose = TRUE)
+
+## Identify anchors and integrate datasets. Use the standard workflow, with the exception that normalization.method = 'SCT'
+all.anchors <- FindIntegrationAnchors(object.list = all_list[2:3], normalization.method = "SCT", 
+    anchor.features = all.features, dims = 1:30, verbose = TRUE) # can omit dims but takes a really long time to run
+allnorm.integrated <- IntegrateData(anchorset = all.anchors, normalization.method = "SCT", 
+    verbose = TRUE)
+
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/v3scTCCA.rds")
+```
+
+```{r, echo = FALSE, eval = FALSE}
+##### HISAT GTF
+all_list <- readRDS("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/HisatAll_list.rds")
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/hisatAll_list9320.rds")
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/hisatAll_list91820.rds")
+
+for (i in 1:length(all_list)){
+  #all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command
+  all_list[[i]] <- SCTransform(all_list[[i]], verbose = FALSE)
+}
+
+saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/Hisat_allscT_9320.rds")
+
+
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_allscT.rds")
+
+## Select features for downstream integration, and run PrepSCTIntegration so that all necessary Pearson residuals have been calculated
+all.features <- SelectIntegrationFeatures(object.list = all_list, nfeatures = 3000) #paper uses 3000 as default but chose to use 2000 like other dataset integration, used 3000 for 9320 dataset
+all_list <- PrepSCTIntegration(object.list = all_list, anchor.features = all.features, verbose = TRUE)
+
+## Identify anchors and integrate datasets. Use the standard workflow, with the exception that normalization.method = 'SCT'
+all.anchors <- FindIntegrationAnchors(object.list = all_list, normalization.method = "SCT", 
+    anchor.features = all.features, verbose = TRUE) # can omit dims but takes a really long time to run, used 1:30 for 9320 dataset but will want to omit in future; omit ndims for 91820 dataset
+allnorm.integrated <- IntegrateData(anchorset = all.anchors, normalization.method = "SCT", 
+    verbose = TRUE)
+
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_allscTCCA.rds")
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_9320_allscTCCA.rds")
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_91820_allscTCCA.rds")
+
+###### v3 dataset
+all.features <- SelectIntegrationFeatures(object.list = all_list[2:3], nfeatures = 2000) #paper uses 3000 as default but chose to use 2000 like other dataset integration
+all_list <- PrepSCTIntegration(object.list = all_list[2:3], anchor.features = all.features, verbose = TRUE)
+
+## Identify anchors and integrate datasets. Use the standard workflow, with the exception that normalization.method = 'SCT'
+all.anchors <- FindIntegrationAnchors(object.list = all_list, normalization.method = "SCT", 
+    anchor.features = all.features, dims = 1:30, verbose = TRUE) # can omit dims but takes a really long time to run
+allnorm.integrated <- IntegrateData(anchorset = all.anchors, normalization.method = "SCT", 
+    verbose = TRUE)
+
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_v3scTCCA.rds")
+```
+
+```{r, echo = FALSE}
+PC = 30
+DM = 1:30
+DMset = 30
+```
+
+```{r, echo = FALSE}
+# functions to trim labels
+# these could be merged to be one function with multiple options
+# and maybe do something more interesting like trim post OG
+# each takes in a ggplot variable and max label length to trim to
+# returns the updated plot variable
+
+# trim labels on x-axis
+trimLabelsX <- function(p,len){
+  pp<- ggplot_build(p)
+  oldxlabels = pp$layout$panel_params[[1]]$x.labels
+  if (length(oldxlabels)==0){
+  oldxlabels = pp$layout$panel_params[[1]]$x$breaks
+  }
+  newxlabels = oldxlabels
+  for (i in 1:length(oldxlabels)){
+    i
+    newxlabels[[i]] =  substr(oldxlabels[[i]],1,len)
+  }
+ p<- p + scale_x_discrete(labels = newxlabels)
+}
+
+#trim labels on y-axies
+trimLabelsY <- function(p,len){
+  pp<- ggplot_build(p)
+  
+  oldylabels = ggplot_build(p)$layout$panel_params[[1]]$y.labels
+    if (length(oldylabels)==0){
+  oldylabels = pp$layout$panel_params[[1]]$y$breaks
+  }
+  newylabels = oldylabels
+for (i in 1:length(oldylabels)){
+    newylabels[[i]] =  substr(oldylabels[[i]],1,len)
+  }
+  p + scale_y_discrete(labels = newylabels)
+}
+
+trimTitle <- function(p,len){
+  title = ggplot_build(p)$plot$labels$title
+  newtitle = substr(title,1,len)
+  p + labs(title=newtitle)
+}
+```
+
+```{r, echo = FALSE}
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/allscTCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/v3scTCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_allscTCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_v3scTCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_9320_allscTCCA.rds")
+all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_91820_allscTCCA.rds")
+DefaultAssay(all) <- "integrated"
+```
+
+```{r echo = FALSE}
+VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
+VlnPlot(all, features = "nCount_RNA", y.max = 20000, pt.size = 0.0001, ncol = 3)
+#plot1 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "percent.mt")
+# visualize the relationship between UMI counts and mitochondrial genes (percent)
+plot2 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+# visualize the relationship between genes (ID as >1 UMI) and mitochondrial genes
+#plot1 + plot2
+plot2
+```
+
+```{r eval = FALSE, echo = FALSE}
+## subset nFeature > 500, not necessary for 91820 dataset since min.features = 750
+all <- subset(all, subset = nFeature_RNA > 500 & nFeature_RNA < 7000 & nCount_RNA <30000)
+# eval features after subsetting: 
+VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
+```
+
+```{r eval = FALSE, echo = FALSE}
+# subset min.features = 750, not necessary for 91820 dataset since min.features = 750
+all <- subset(all, subset = nFeature_RNA > 750 & nFeature_RNA < 7000 & nCount_RNA <30000)
+# eval features after subsetting: 
+VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0) + NoLegend() 
+#VlnPlot(all, features = c("nCount_RNA"), pt.size = 0, y.max = 30000) + NoLegend() 
+#VlnPlot(all, features = c("nFeature_RNA"), pt.size = 0, y.max = 7500) + NoLegend()
+```
+
+## Run PCA and generate UMAP
+```{r echo = FALSE}
+all <- RunPCA(all, npcs = PC, verbose = FALSE)
+for (i in DM){ 
+p<-DimHeatmap(all, dims = i, cells = 500, balanced = TRUE)
+print(p)
+}
+
+ElbowPlot(all, ndims = DMset)
+
+all <- JackStraw(all, dims = DMset) # dims max depends on how many pcs originally calculated
+all <- ScoreJackStraw(all, dims = DM)
+JackStrawPlot(all, dims = DM)
+```
+
+```{r echo = FALSE}
+# original clustering
+all <- RunUMAP(all, reduction = "pca", dims = DM) #vignette places UMAP before neighbors/clusters
+all <- FindNeighbors(all, dims = DM) 
+all <- FindClusters(all, resolution = 1) # can omit resolution
+DimPlot(all, reduction = "umap", label = TRUE) + NoLegend()
+DimPlot(all, reduction = "umap", group.by = "orig.ident")
+```
+
+## Build a hierarchical tree & plot UMAP
+```{r echo = FALSE}
+all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = DM)
+PlotClusterTree(all.tree, label = TRUE)
+DimPlot(all.tree, reduction = "umap", label = TRUE) + NoLegend()
+DimPlot(all.tree, reduction = "umap", group.by = "orig.ident")
+```
+
+## Examine cell-cluster information & cluster features
+```{r echo = FALSE}
+id_cell <- table(Idents(all.tree))
+barplot(id_cell, main = "cell # in each cluster", xlab = "cluster ID")
+#table(all.tree$orig.ident)
+#prop.table(table(Idents(all.tree)))
+id_runs <- table(all.tree$orig.ident, Idents(all.tree))
+#barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "palegreen3", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # all runs
+barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # v3 chem
+
+plot(id_runs[1,],id_runs[2,],xlab = "Run 1",ylab="Run 2")
+
+VlnPlot(all.tree, features = "nCount_RNA", y.max = 20000, pt.size = 0, ncol = 1) + NoLegend()
+VlnPlot(all.tree, features = "nFeature_RNA", y.max = 7500, pt.size = 0, ncol = 1) + NoLegend()
+```
+
+## ID cluster markers based on dendogram renumbering
+```{r, echo = FALSE} 
+markers_list = list()
+for (m in 1:nlevels((all.tree$seurat_clusters))){
+  markersROC <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.5, test.use = "roc", only.pos = TRUE)
+  markersROC <- setNames(cbind(rownames(markersROC), markersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
+  markersROC$diff_exp <- (markersROC$pct.1/markersROC$pct.2)
+  markersROC <- markersROC[order(-markersROC$power),]
+  header <- paste("Cluster", m, sep = " ")
+  top5markers <- paste((head(markersROC$geneID, n = 5)))
+  marker_output <- c(header, top5markers)
+  #print(marker_output) # leave out for html knit
+  markers_list[m] = markersROC
+  
+  p<-DotPlot(all.tree,features=rev(head(markersROC$geneID,50))) + RotatedAxis()
+p<- trimLabelsX(p,20)
+p<- p + labs(title = header)
+print(p)
+}
+
+# write.csv(markers_list, "/Users/josongco/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/clustermarkers9120.csv") #9120 indicates dataset
+```
+
+## ID markers for nodes/connecting points of dendogram
+```{r eval = TRUE, echo = FALSE}
+# works but sometimes crashes - too big?
+print(PlotClusterTree(all.tree, label = TRUE))
+
+nodes <- unique(all.tree@tools$BuildClusterTree$edge[,1])
+node_markers = list()
+for (n in 1:length(nodes)){
+    nodemarkersROC <- FindMarkers(all.tree, ident.1 = "clustertree", ident.2 = nodes[n],  test.use = "roc", only.pos = TRUE)
+  nodemarkersROC <- setNames(cbind(rownames(nodemarkersROC), nodemarkersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
+  nodemarkersROC$diff_exp <- (nodemarkersROC$pct.1/nodemarkersROC$pct.2)
+  leftMarkers <- nodemarkersROC[nodemarkersROC$avg_diff>0,]
+  leftMarkers <- leftMarkers[order(-leftMarkers$power),]
+  rightMarkers <- nodemarkersROC[nodemarkersROC$avg_diff<0,]
+  rightMarkers <- rightMarkers[order(-rightMarkers$power),]
+  
+  leftrightMarkers = rbind(head(leftMarkers,25),head(rightMarkers,25))
+  nodemarkersROC <- nodemarkersROC[order(-nodemarkersROC$power),]
+  node_markers[[n]] = leftrightMarkers
+  node_header <- paste("Node", nodes[n], sep = " ")
+  #top5nodemarkers <- paste(head(nodemarkersROC$geneID, n = 5))
+  #nodemarker_output <- c(node_header, top5nodemarkers)
+ #print(nodemarker_output) # leave out for html knit
+  
+#  p<-DotPlot(all.tree,features=rev(head(markersROC$geneID,50))) + RotatedAxis()
+#p<- trimLabelsX(p,20)
+#print(p)
+
+  p<-DotPlot(all.tree,features=rev(leftrightMarkers$geneID)) + RotatedAxis()
+p<- trimLabelsX(p,20)
+p<-p + labs(title = node_header)
+print(p)
+
+
+}
+
+
+```
+
+## Plot features
+````{r, echo = FALSE, eval = TRUE}
+### function to find list of ocbims in all gene names
+### takes a list of ocbims, returns matching index for each one
+all.genes <- rownames(all.tree@assays$RNA) 
+
+findGenes <- function(yfg,allgenes) {
+  genelist <- vector()
+  nomatch <- list()
+  for (i in 1:length(yfg)){
+    gene <- yfg[[i]]
+    gene<-substr(gene,10,str_length(gene))
+    gene<- paste("OB", gene, sep = "")
+    loc <- grep(gene,allgenes)
+    # check that there was one identified, and that the gene wasn't empty (will be OB and match everything!)
+    if (length(loc)>0& nchar(gene)>2) {
+      genelist <- c(genelist,loc)
+    } else {
+      nomatch <- c(nomatch,yfg[[i]])
+    }
+  }
+  return(genelist)
+}
+
+```
+
+```{r echo = FALSE, eval = TRUE}
+## USE ME
+#### change eval = FALSE when using Orig GTF
+
+yfg <- read.csv("~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
+
+#yfg <- read.csv("D:/data/octo seq/Genes for in situ.csv",stringsAsFactors=FALSE)
+
+# find match for yfg and all gene names
+
+genelist <- findGenes(yfg[1:12,2],all.genes)
+
+
+# hisat file was not able to find the following: 
+# "Ocbimv22021175" = synaptotagmin OG.20163
+# "Ocbimv22024718" = VGlut OG.8038
+# "Ocbimv22017369" = TH OG.16681
+# "Ocbimv22001324" = FMRF-amide OG.28623
+# "Ocbimv22031264" = TyrBH OG.41051
+
+DefaultAssay(all.tree) <- "RNA"
+
+# dotplot of all genes from list
+p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()
+p<- trimLabelsX(p,20)
+print(p)
+
+# featureplot of all genes in list
+for (i in 1:length(genelist)){
+  p<- FeaturePlot(all.tree, features = all.genes[genelist[i]], ncol = 1) + NoLegend() + NoAxes() 
+  p<- trimTitle(p,30)
+  print(p)
+}
+
+# violin plot for all genes in list
+for (i in 1:length(genelist)){
+  p <- VlnPlot(all.tree, features = all.genes[genelist[i]], ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
+  p<-trimTitle(p,30)
+  print(p)
+}
+
+#dotplot of some selected genes
+#DotPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038")) #synaptotagmin, TH, FMRF-amide, TyrBH, VGlut)
+
+#FeaturePlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038"), ncol = 1)
+#FeaturePlot(all.tree, features = ("VACHT"))
+
+
+#VlnPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038"), pt.size = 0, ncol = 1)
+
+#grep("glut",all.genes)
+ #[1]  2034  4008  4599 10227 12291 14312 18187 19855 19948 27719 32028 40993 41561
+
+#VlnPlot(all.tree,features = c(all.genes[2034],all.genes[4008], all.genes[4599], all.genes[10227]), pt.size = 0, ncol = 1) 
+#VlnPlot(all.tree, features = c(all.genes[12291], all.genes[14312], all.genes[18187], all.genes[19855]), pt.size = 0, ncol = 1) 
+#VlnPlot(all.tree, features  = c(all.genes[19948], all.genes[27719], all.genes[32028], all.genes[40993], all.genes[41561]), pt.size = 0, ncol = 1) # glut
+
+# Can also use line of code below to find candidate gene 
+#FeaturePlot(all.tree,features = all.genes[grep("VGlut",all.genes)])
+#FeaturePlot(all.tree,features = all.genes[grep("glut",all.genes)]) * use this one!!
+#
+#1synaptotagmin	Ocbimv22021175	NA	neurons	NA	G
+#2	VAchT	Ocbimv22001681	NA	cholinergic neurons	NA	R
+#3	ChaT	Ocbimv22001674	NA	cholinergic neurons	NA	G
+#4	VGlut	Ocbimv22024718	NA	glutamatergic neurons	NA	R ------
+#5	TH	Ocbimv22017369	NA	dopaminergic neurons (and pigment?)	NA	R
+#6	DAT	Ocbimv22026818	NA	just dopaminergic?	NA	G
+```
+
