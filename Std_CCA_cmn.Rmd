@@ -1,5 +1,5 @@
 ---
-title: "Standard Norm of HiSeq with updated names 09/13/20"
+title: "Standard Norm of HiSeq with updated names 09/18/20"
 author: "jos"
 date: "9/17/2020"
 output: 
@@ -71,11 +71,13 @@ all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqCombined_hisat.rd
 all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/hisatAll_list9120.rds") #HiSeqCombined updated gene names 09/01/2020
 all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/hisatAll_list9320.rds") #HiSeqCombined updated gene names 09/03/2020
 all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/hisatAll_list91320.rds") #HiSeqCombined updated gene names 09/13/2020
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/hisatAll_list91320.rds") #HiSeqCombined updated gene names 09/18/2020
+all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/hisatAll_list_nonames.rds")
 
 for (i in 1:length(all_list)){
   #all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command
    all_list[[i]] <- NormalizeData(all_list[[i]])
-   all_list[[i]] <- FindVariableFeatures(all_list[[i]], selection.method = "vst") #omit nfeatures = 2000 for 9120, 9320, 91320 dataset
+   all_list[[i]] <- FindVariableFeatures(all_list[[i]], selection.method = "vst") #omit nfeatures = 2000 for 9120, 9320, 91320, 91820, no names dataset
 }
 
 saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/Hisat_allStd.rds") # not necessary for HiSeq data
@@ -84,7 +86,7 @@ saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/Hisat_allStd.rds") # not
 all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_allStd.rds") # not necessary for HiSeq data
 
 ## Identify anchors and integrate datasets.
-all.anchors <- FindIntegrationAnchors(object.list = all_list, anchor.features = 3000, verbose = TRUE) # can omit dims = 1:30 but takes a really long time to run; determine if want to keep anchor.features = 2000; anchor.features = 3000 for 91320 data; omit ndims for 9120, 9320, 91320 data 
+all.anchors <- FindIntegrationAnchors(object.list = all_list, anchor.features = 3000, verbose = TRUE) # can omit dims = 1:30 but takes a really long time to run; determine if want to keep anchor.features = 2000; anchor.features = 3000 for 91320 data; omit ndims for 9120, 9320, 91320, 91820 data 
 allnorm.integrated <- IntegrateData(anchorset = all.anchors, verbose = TRUE)
 
 saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_allStdCCA.rds")
@@ -94,6 +96,8 @@ saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCom
 saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds") #omit nfeatures = 2000, ndims = 1:30 for 9120 dataset
 saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9320StdCCA.rds") #omit nfeatures = 2000, ndims = 1:30 for 9320 dataset
 saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined91320StdCCA.rds") #omit nfeatures = 2000, ndims = 1:30 for 91320 dataset
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined91820StdCCA.rds") #omit nfeatures = 2000, ndims = 1:30 for 91820 dataset
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined_nonames_StdCCA.rds") #omit nfeatures = 2000, ndims = 1:30 for nonames dataset
 
 ###### v3 dataset
 ## Identify anchors and integrate datasets. 
@@ -212,7 +216,8 @@ trimTitle <- function(p,len){
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiseqCombinedStd_str8.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9320StdCCA.rds")
-all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined91320StdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined91320StdCCA.rds")
+all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined91820StdCCA.rds")
 #all <- readRDS("D:/data/octo seq/Hisat_HiSeqCombined9120StdCCA.rds")
 
 DefaultAssay(all) <- "integrated" #omit if using straight merge
@@ -237,14 +242,13 @@ all <- subset(all, subset = nFeature_RNA > 500 & nFeature_RNA < 7000 & nCount_RN
 VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
 ```
 
-```{r echo = FALSE, eval = FALSE}
+```{r echo = FALSE, eval = TRUE}
 ## Subset nFeature > 750
 # subset min.features = 750, omit for 91320 dataset since min.features = 750
 all <- subset(all, subset = nFeature_RNA > 750 & nFeature_RNA < 7000 & nCount_RNA <30000)
 # eval features after subsetting: 
-VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, y.max = 30000) + NoLegend() 
-#VlnPlot(all, features = c("nCount_RNA"), pt.size = 0, y.max = 30000) + NoLegend() 
-#VlnPlot(all, features = c("nFeature_RNA"), pt.size = 0, y.max = 7500) + NoLegend()
+VlnPlot(all, features = c("nFeature_RNA"), pt.size = 0, y.max = 7500) + NoLegend()
+VlnPlot(all, features = c("nCount_RNA"), pt.size = 0, y.max = 30000) + NoLegend() 
 ```
 
 ## Run PCA and generate UMAP

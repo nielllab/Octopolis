@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, echo = FALSE}
-# to knit document, use the following command: rmarkdown::render("/Users/josongco/Desktop/FinalSeqData/scT_CCA.Rmd") ~30m [rename file when saved so code doesn't overwrite while producing next html]
+# to knit document, use the following command: rmarkdown::render("/Users/josongco/GitHub/Octopolis/scT_CCA.Rmd") ~30m [rename file when saved so code doesn't overwrite while producing next html]
 
 library(Seurat)
 library(Matrix)
@@ -183,13 +183,13 @@ all <- subset(all, subset = nFeature_RNA > 500 & nFeature_RNA < 7000 & nCount_RN
 VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
 ```
 
-```{r eval = FALSE, echo = FALSE}
+```{r eval = TRUE, echo = FALSE}
 # subset min.features = 750, not necessary for 91820 dataset since min.features = 750
 all <- subset(all, subset = nFeature_RNA > 750 & nFeature_RNA < 7000 & nCount_RNA <30000)
 # eval features after subsetting: 
-VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0) + NoLegend() 
-#VlnPlot(all, features = c("nCount_RNA"), pt.size = 0, y.max = 30000) + NoLegend() 
-#VlnPlot(all, features = c("nFeature_RNA"), pt.size = 0, y.max = 7500) + NoLegend()
+#VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0) + NoLegend() 
+VlnPlot(all, features = c("nCount_RNA"), pt.size = 0, y.max = 30000) + NoLegend() 
+VlnPlot(all, features = c("nFeature_RNA"), pt.size = 0, y.max = 7500) + NoLegend()
 ```
 
 ## Run PCA and generate UMAP
