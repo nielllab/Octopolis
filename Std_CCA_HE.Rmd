@@ -155,6 +155,7 @@ allnorm.integrated <- IntegrateData(anchorset = all.anchors, verbose = TRUE)
 saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined_HE_StdCCA.rds") #omit nfeatures = 2000, ndims = 1:30 for nonames dataset
 ```
 
+## START HERE
 ```{r, echo = FALSE}
 PC = 30
 DM = 1:30
@@ -276,8 +277,10 @@ all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot =
 PlotClusterTree(all.tree, label = TRUE)
 DimPlot(all.tree, reduction = "umap", label = TRUE)
 DimPlot(all.tree, reduction = "umap", group.by = "orig.ident")
-saveRDS(all.tree, "/Users/josongco/Desktop/FinalSeqData/alltree_HE.rds")
+all.tree <- readRDS("/Users/josongco/Desktop/FinalSeqData/alltree_HE.rds")
 ```
+
+## START HERE FOR "ALL.TREE" RDS OBJECT
 
 ## Examine cell-cluster information & cluster features
 ```{r echo = FALSE}
@@ -383,7 +386,7 @@ findGenes <- function(yfg,allgenes) {
 ```
 
 ```{r echo = FALSE, eval = TRUE}
-yfg <- read.csv("~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
+yfg <- read.csv("~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE) #gene list
 
 #yfg <- read.csv("D:/data/octo seq/Genes for in situ.csv",stringsAsFactors=FALSE)
 
@@ -421,7 +424,20 @@ for (i in 1:length(genelist)){
 }
 
 #dotplot of some selected genes
-#DotPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038")) #synaptotagmin, TH, FMRF-amide, TyrBH, VGlut)
+VlnPlot(all.tree, features = c("Glycosyl-transferase-family-2-Predicted-glycosyltransferase-involved-in-capsule-biosynthesis-Galactosyltransferase-Ricin-type-beta-trefoil-lectin-domain-UDP-N-acetyl-alpha-D-galactosamine:polypeptide-acetylgalactosaminyltransferase-7-GalNAc-T7-OG19952-OB33694",
+"B3-4-domain-tRsynthetase-B5-Glycolipid-transfer-protein-GLTP-glycolipid-containing-1-OG19956-OB33695-OB33697"), ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
+
+VlnPlot(all.tree, features = c("Metallo-beta-lactamase-superfamily-Beta-Casp-domain-cleavage-and-polyadenylation-specific-factor-3-like-OG19958-OB33698",
+"Amyloid-protein-binding-amyloid-beta-precursor-cytoplasmic-tail-2-OG19962-OB33699"), ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
+
+VlnPlot(all.tree, features = c("amyloid-beta-precursor-protein-cytoplasmic-tail-binding-2-OG19965-OB33700",
+"Rrecognition-motif.-a.k.a.-RRM-RBD-or-RNP-domain-splicing-factor-3b-subunit-4-49kDa-OG19967-OB33701"), ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
+
+VlnPlot(all.tree, features = c("C2H2-Zinc-finger-type-zinc-protein-548-OG19970-OB33702",
+"NA-OG19951-OB33692-OB33693",
+"NA-OG19950-OB33692-OB33693"), ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
+
+DotPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038")) #synaptotagmin, TH, FMRF-amide, TyrBH, VGlut)
 
 #FeaturePlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051", "OG.8038"), ncol = 1)
 #FeaturePlot(all.tree, features = ("VACHT"))
