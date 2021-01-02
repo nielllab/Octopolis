@@ -220,9 +220,9 @@ trimTitle <- function(p,len){
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9320StdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined91320StdCCA.rds")
-#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined91820StdCCA.rds")
+all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined91820StdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Original_HiSeqCombined91820StdCCA.rds")
-all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined_HE_StdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined_HE_StdCCA.rds")
 #all <- readRDS("D:/data/octo seq/Hisat_HiSeqCombined9120StdCCA.rds")
 
 DefaultAssay(all) <- "integrated" #omit if using straight merge
@@ -397,13 +397,16 @@ findGenes <- function(yfg,allgenes) {
 ```
 
 ```{r echo = FALSE, eval = TRUE}
-yfg <- read.csv("~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
+#yfg <- read.csv("~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
 
 #yfg <- read.csv("D:/data/octo seq/Genes for in situ.csv",stringsAsFactors=FALSE)
 
+neurogenes1 <- read.csv("/Users/josongco/Desktop/FinalSeqData/GeneIDs - Neuro.csv")
+
 # find match for yfg and all gene names
 
-genelist <- findGenes(yfg[1:12,2],all.genes)
+neuro1genelist <- findGenes(neurogenes1[2:110,2], all.genes) # neuro genes 1
+#genelist <- findGenes(yfg[1:12,2],all.genes)
 
 
 # hisat file was not able to find the following: 
@@ -415,21 +418,38 @@ genelist <- findGenes(yfg[1:12,2],all.genes)
 
 DefaultAssay(all.tree) <- "RNA"
 
+# for loop for saving plots starts here: 
+for (row in 1:nrow(neurogenes1)){
+
+ name = neurogenes1$Gene.I[row]
+ name2 = neurogenes1$Gene[row]
+ gene = rev(all.genes[neuro1genelist])
+ 
+dotplotName = paste(gene,'dotplot.png', sep = '_')
+ png(dotplotName, width = 900, height = 700)
+ dp <- DotPlot(all.tree, features = rev(all.genes[neuro1genelist])) + RotatedAxis()
+ dp<- trimLabelsX(p,20)
+ print(dp)
+ dev.off()
+ 
+ }
+
+
 # dotplot of all genes from list
-p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()
+p<-DotPlot(all.tree,features=rev(all.genes[neuro1genelist])) + RotatedAxis()
 p<- trimLabelsX(p,20)
 print(p)
 
 # featureplot of all genes in list
-for (i in 1:length(genelist)){
-  p<- FeaturePlot(all.tree, features = all.genes[genelist[i]], ncol = 1) + NoLegend() + NoAxes() 
+for (i in 1:length(neuro1genelist)){
+  p<- FeaturePlot(all.tree, features = all.genes[neuro1genelist[i]], ncol = 1) + NoLegend() + NoAxes() 
   p<- trimTitle(p,30)
   print(p)
 }
 
 # violin plot for all genes in list
-for (i in 1:length(genelist)){
-  p <- VlnPlot(all.tree, features = all.genes[genelist[i]], ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
+for (i in 1:length(neuro1genelist)){
+  p <- VlnPlot(all.tree, features = all.genes[neuro1genelist[i]], ncol = 1, pt.size = 0) + NoLegend()
   p<-trimTitle(p,30)
   print(p)
 }

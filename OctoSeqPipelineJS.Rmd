@@ -31,6 +31,7 @@ Prior to mounting, user will need to create a directory to mount to; in my case,
 ## Set working directory (run this line of code from the console rather than in a chunk)
 ```{r}
 setwd("/Users/gcoffing/Documents/Documents/octo/Seurat")
+setwd("/Users/josongco/Desktop/FinalSeqData")
 ```
 
 ## Load libraries for Seurat
@@ -42,7 +43,7 @@ library(sctransform)
 library(stringr)
 ```
 
-## Set pathway
+## Set pathway & parameters
 ```{r}
 # change depending on user
 user = "mea"
@@ -55,7 +56,6 @@ if (user == "mea"){
 }
 ```
 
-
 ## Read in files
 ```{r}
 # read in csv with the directories
@@ -64,7 +64,38 @@ data_dir <- as.vector(datafiles$Directory)
 
 # read in csv namekey
 namekey <- read.csv(full_namekey, stringsAsFactors = FALSE)
+```
 
+## Hashmap for replacing names: Original or Hisat GTF?
+```{r}
+#making a hashmap of OctoGenes/Ocbims to fullnames from the seurat namekey 
+gtf = "hisat"
+if (gtf == "original") {
+    unclass(by(namekey, namekey$Ocbimv, function(x) {
+     tmp <- x$fullname
+      setNames(tmp, x$Ocbimv[1])
+     tmp
+     })) -> namekeyDict
+} else if (gtf == "hisat"){
+   unclass(by(namekey, namekey$OctoGene, function(x) {
+     tmp <- x$fullname
+     setNames(tmp, x$OctoGene[1])
+      tmp
+      })) -> namekeyDict
+}
+```
+
+## Check that hashmap worked properly
+```{r}
+if (gtf == "original") {
+#Check that the hashmap is working properly (original gtf)
+print(namekeyDict[["Ocbimv22027788m"]]) #should print  "NA-OG10040-OB27788"
+print(namekeyDict[["Ocbimv22030350m"]]) #should print "Endonuclease-Exonuclease-phosphatase-family-phosphodiesterase-12-OG10002-OB30350" 
+} else if (gtf == "hisat") {
+#Check that the hashmap is working properly (hisat)
+print(namekeyDict[["OCTOGene.1"]]) #should print "NA-OG1"
+print(namekeyDict[["OCTOGene.10032"]]) #should print "anaphase-promoting-complex-subunit-7-OG10032-OB20676-OB29021"
+}
 ```
 
 ## An overview of data processing is as follows:
@@ -77,41 +108,46 @@ namekey <- read.csv(full_namekey, stringsAsFactors = FALSE)
 #make empty list for all the seurat objects
 all_list = list() 
 
-#making a hashmap of OctoGenes to fullnames from the seurat namekey
-unclass(by(namekey, namekey$OctoGene, function(x) {
-  tmp <- x$fullname
-  setNames(tmp, x$OctoGene[1])
-  tmp
-  })) -> namekeyDict
-
-#Check that the hashmap is working properly
-print(namekeyDict[["OCTOGene.1"]]) #should print "NA-OG1"
-print(namekeyDict[["OCTOGene.10032"]]) #should print "anaphase-promoting-complex-subunit-7-OG10032-OB20676-OB29021"
-```
-
-```{r}
-ct = 1
-for(f in 1:2){ #New gtf, NextSeq + HiSeq from directory master
-  all <- Read10X(data.dir = data_dir[f+16])
-  #ngenes <- length(all@Dimnames[[1]])
-  #for (g in 1:ngenes){
-   #   gene <- all@Dimnames[[1]][g]
-   #   temp <- namekeyDict[[gene]]
-    #  if (length(temp) == length(all@Dimnames[[1]][g])){ #This checks that temp is not zero
-     #    all@Dimnames[[1]][g] <- temp
-      #   }
-      # }
+ct = 1 #what is ct?
+for(f in 1:2){ #Old or New gtf, NextSeq + HiSeq from directory master
+  all <- Read10X(data.dir = data_dir[f+16]) # f+16 for new gtf HiSeq, f+10 for old gtf HiSeq
+  ngenes <- length(all@Dimnames[[1]])
+    if (gtf == "original"){ #replacing Ocbim names
+      for (g in 1:ngenes){
+        gene <- all@Dimnames[[1]][g]
+        gene <- substr(gene, 6, str_length(gene)-2)
+        ind<- grep(gene, namekey[[3]])
+        if (length(ind)>0) {
+          id <- namekey[[ind[1], 2]]
+          if (str_length(id)>0){
+            id <- str_remove_all(id, "\\(") # parentheses mess up gene names as dimensions
+            id <- str_remove_all(id, "\\)") 
+            id <- substr(id, 1, 60) # keep it short
+            all@Dimnames[[1]][g] <- temp
+        }
+      }
+        } 
+      } else if (gtf == "hisat"){ #replacing Octogene names
+      for (g in 1:ngenes){
+        gene <- all@Dimnames[[1]][g]
+        temp <- namekeyDict[[gene]]
+        if (length(temp) == length(all@Dimnames[[1]][g])){ #This checks that temp is not zero
+         all@Dimnames[[1]][g] <- temp
+         }
+       }
+      }
   all <- CreateSeuratObject(counts = all, project = paste("Run", f, sep = ""), min.cells = 3, min.features = 750)
   all_list[[ct]] = all
   ct = ct + 1
 }
 
-# Check that all names were replaced correctly
+
+# Check that all names were replaced correctly # does not work for original gtf
 grep("VGlut",all_list[[1]]@assays[["RNA"]]@data@Dimnames[[1]], ignore.case = TRUE) # prints [1] 2646 5437
 # double check that this is the right gene that you were looking for
 all_list[[1]]@assays[["RNA"]]@data@Dimnames[[1]][5437] # prints "VGlut-Major-Facilitator-Superfamily-solute-carrier-family-17-sodium-dependent-inorganic-phosphate-cotransporter-member-6-OG8038-OB24718"
 
-saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/hisatAll_list_nonames.rds") #change depending on dataset
+saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/hisatAll_list_HE.rds") #change depending on dataset
   
 # To access individual objects: all_list[[1]]
 #example: all_list[[1]] will print the object information on Seurat object 1
