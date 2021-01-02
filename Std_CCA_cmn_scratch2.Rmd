@@ -428,13 +428,6 @@ yfg <- read.csv("D:/data/octo seq/Genes for in situ.csv",stringsAsFactors=FALSE)
 genelist <- findGenes(yfg[1:22,2],all.genes)
 
 
-# hisat file was not able to find the following: 
-# "Ocbimv22021175" = synaptotagmin OG.20163
-# "Ocbimv22024718" = VGlut OG.8038
-# "Ocbimv22017369" = TH OG.16681
-# "Ocbimv22001324" = FMRF-amide OG.28623
-# "Ocbimv22031264" = TyrBH OG.41051
-
 DefaultAssay(all.tree) <- "RNA"
 
 # dotplot of all genes from list
@@ -445,16 +438,16 @@ print(p)
 # featureplot of all genes in list
 for (i in 1:length(genelist)){
   p<- FeaturePlot(all.tree, features = all.genes[genelist[i]], ncol = 1) + NoLegend() + NoAxes() 
-  p<- trimTitle(p,30)
+  p<- trimTitle(p,60)
   print(p)
 }
 
 # violin plot for all genes in list
-for (i in 1:length(genelist)){
-  p <- VlnPlot(all.tree, features = all.genes[genelist[i]], ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
-  p<-trimTitle(p,30)
-  print(p)
-}
+#for (i in 1:length(genelist)){
+#  p <- VlnPlot(all.tree, features = all.genes[genelist[i]], ncol = 1, #pt.size = 0) + NoLegend() + NoAxes()
+#  p<-trimTitle(p,30)
+#  print(p)
+#}
 
 
 
@@ -489,6 +482,8 @@ FeaturePlot(all.tree, features = c("nFeature_RNA", "nCount_RNA"))
 ```
 
 ```{r}
+# plot all cadherins in dotplot
+
 DefaultAssay(all.tree) <- "RNA"
 yfg <- read.csv("D:/data/octo seq/GeneIDs - Cadherins.csv",stringsAsFactors=FALSE)
 
@@ -510,26 +505,27 @@ genelist <- findGenes(yfg[,1],all.genes)
 genelist <- unique(genelist)
 # dotplot of all genes from list
 p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 8))
-p<- trimLabelsX(p,100)
+p<- trimLabelsX(p,30)
 print(p)
 ```
 
 ```{r}
+# plot all genes in a group, but only ones that are specifically expressed (i.e. markers)
 #markers <- FindAllMarkers(all.tree,logfc.threshold = 0.5, min.pct = 0.5)
 
 
 DefaultAssay(all.tree) <- "RNA"
 
 yfg <- read.csv("D:/data/octo seq/GeneIDs - Cadherins.csv",stringsAsFactors=FALSE)
-yfg <- read.csv("D:/data/octo seq/GeneIDs - NP Corr.csv",stringsAsFactors=FALSE)
+#yfg <- read.csv("D:/data/octo seq/GeneIDs - NP Corr.csv",stringsAsFactors=FALSE)
 
-yfg <- read.csv("D:/data/octo seq/GeneIDs - More Neuro.csv",stringsAsFactors=FALSE)
-yfg <- read.csv("D:/data/octo seq/GeneIDs - Neuro.csv",stringsAsFactors=FALSE)
+#yfg <- read.csv("D:/data/octo seq/GeneIDs - More Neuro.csv",stringsAsFactors=FALSE)
+#yfg <- read.csv("D:/data/octo seq/GeneIDs - Neuro.csv",stringsAsFactors=FALSE)
 
-yfg <- read.csv("D:/data/octo seq/GeneIDs - Devo_TFs.csv",stringsAsFactors=FALSE)
+#yfg <- read.csv("D:/data/octo seq/GeneIDs - Devo_TFs.csv",stringsAsFactors=FALSE)
 
 
-genelist <- findGenes(yfg[,4],all.genes)
+genelist <- findGenes(yfg[,1],all.genes)
 genelist <- unique(genelist)
 
 use<- intersect(all.genes[genelist],unique(markers$gene))
