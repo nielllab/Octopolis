@@ -406,6 +406,8 @@ neurogenes1 <- read.csv("/Users/josongco/Desktop/FinalSeqData/GeneIDs - Neuro.cs
 # find match for yfg and all gene names
 
 neuro1genelist <- findGenes(neurogenes1[2:110,2], all.genes) # neuro genes 1
+neuro1genelist <- unique(neuro1genelist)
+
 #genelist <- findGenes(yfg[1:12,2],all.genes)
 
 
@@ -420,9 +422,6 @@ DefaultAssay(all.tree) <- "RNA"
 
 # for loop for saving plots starts here: 
 for (row in 1:nrow(neurogenes1)){
-
- name = neurogenes1$Gene.I[row]
- name2 = neurogenes1$Gene[row]
  gene = rev(all.genes[neuro1genelist])
  
 dotplotName = paste(gene,'dotplot.png', sep = '_')
@@ -434,6 +433,17 @@ dotplotName = paste(gene,'dotplot.png', sep = '_')
  
  }
 
+for (row in 1:nrow(neurogenes1)){
+ gene = rev(all.genes[neuro1genelist])
+ 
+featureplotName = paste(gene,'featureplot.png', sep = '_')
+ png(featureplotName, width = 900, height = 700)
+ fp <- FeaturePlot(all.tree, features = rev(all.genes[neuro1genelist])) + NoLegend() + NoAxes() 
+ fp<- trimTitle(p,30)
+ print(fp)
+ dev.off()
+ 
+ }
 
 # dotplot of all genes from list
 p<-DotPlot(all.tree,features=rev(all.genes[neuro1genelist])) + RotatedAxis()
