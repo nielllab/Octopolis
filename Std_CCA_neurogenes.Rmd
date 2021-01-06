@@ -421,25 +421,31 @@ neuro1genelist <- unique(neuro1genelist)
 DefaultAssay(all.tree) <- "RNA"
 
 # for loop for saving plots starts here: 
+getwd()
+
 for (row in 1:nrow(neurogenes1)){
+  print(row)
  gene = rev(all.genes[neuro1genelist])
  
-dotplotName = paste(gene,'dotplot.png', sep = '_')
+#dotplotName = paste(gene,'dotplot.png', sep = '_')
+dotplotName <- file.path("/Users","jsongco","Desktop", "FinalSeqData", "in situ feature plots", "allneuro", paste(gene[row],'dotplot.png', sep = '_'))
  png(dotplotName, width = 900, height = 700)
  dp <- DotPlot(all.tree, features = rev(all.genes[neuro1genelist])) + RotatedAxis()
- dp<- trimLabelsX(p,20)
+ dp<- trimLabelsX(dp,20)
  print(dp)
  dev.off()
  
  }
 
 for (row in 1:nrow(neurogenes1)){
+  print(row)
  gene = rev(all.genes[neuro1genelist])
  
-featureplotName = paste(gene,'featureplot.png', sep = '_')
+#featureplotName = paste(gene,'featureplot.png', sep = '_')
+featureplotName <- file.path("/Users","jsongco","Desktop", "FinalSeqData", "in situ feature plots", "allneuro", paste(gene[row],'featureplot.png', sep = '_'))
  png(featureplotName, width = 900, height = 700)
- fp <- FeaturePlot(all.tree, features = rev(all.genes[neuro1genelist])) + NoLegend() + NoAxes() 
- fp<- trimTitle(p,30)
+ dp <- FeaturePlot(all.tree, features = rev(all.genes[neuro1genelist])) + NoLegend() + NoAxes() 
+ fp<- trimTitle(fp,30)
  print(fp)
  dev.off()
  
