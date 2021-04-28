@@ -38,3 +38,9 @@ angles:
     x2: head_cent_x
     y1: mantle_y
     y2: head_cent_y
+  ang_from_cent:
+    base_name: from_tube_cent
+    x1: tube_cent_x
+    x2: head_cent_x
+    y1: tube_cent_y
+    y2: head_cent_y

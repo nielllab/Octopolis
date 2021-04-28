@@ -71,9 +71,11 @@ def main(config_path):
         # get centerpoint of head (centerpoint between the center points of both eyes)
         octodata = get_center(octodata, config['angles']['head_names'])
         # get angle of body (angle between mantle and centerpoint between eyes)
-        octodata = get_angle(octodata, config['angles']['body_names'])
+        octodata = get_angles(octodata, config['angles']['body_names'])
+        # get angle from center of tube to center of animal head
+        octodata = get_angles(octodata, config['angles']['ang_from_cent'])
         # get octo rotation around the center of the tube
-        octodata = get_rotation(octodata)
+        octodata = get_rotation(octodata, config['angles']['ang_from_cent'])
         # save out as .h5 file in the recording directory
         save_path = os.path.join(base_path, 'tracking.h5')
         octodata.to_hdf(save_path, 'w')
