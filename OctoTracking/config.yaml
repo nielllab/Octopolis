@@ -1,0 +1,40 @@
+# OctoTracking config
+# copy with 'save as' and edit for each session
+
+session_dir: /path/
+
+# POSE ESTIMATION
+pose_estimation:
+  network: /path/to/dlc/network/config.yaml
+
+# TRACKING
+tracking:
+  lik_thresh: 0.90
+  frame_rate: 30
+
+# ANGLES
+angles:
+  leye_names:
+    base_name: lefteye
+    x1: front_left_x
+    x2: back_left_x
+    y1: front_left_y
+    y2: back_left_y
+  reye_names:
+    base_name: righteye
+    x1: front_right_x
+    x2: back_right_x
+    y1: front_right_y
+    y2: back_right_y
+  head_names:
+    base_name: head
+    x1: righteye_cent_x
+    x2: lefteye_cent_x
+    y1: righteye_cent_y
+    y2: lefteye_cent_y
+  body_names:
+    base_name: body
+    x1: mantle_x
+    x2: head_cent_x
+    y1: mantle_y
+    y2: head_cent_y
