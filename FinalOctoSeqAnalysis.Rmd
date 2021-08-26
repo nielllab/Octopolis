@@ -1,0 +1,773 @@
+---
+title: "FinalOctoSeqPipeline"
+author: "jos"
+date: "8/2/2021"
+output: 
+  html_document:
+    fig_height: 12
+    fig_width: 17
+---
+
+This is the protocol for analyzing Octo Seq data using RStudio (3.6.3), Seurat (3.1.4), Mac (OS Catalina 10.15.7). The first steps outline how to get started with RStudio and Seurat and how to set up sshfs for Mac in order to access raw data from the Talapas server. If you have already set up R, RStudio, Seurat, and sshfs, then you can begin at section "Mount to Talapas" and proceed with setting your working directory and reading in the raw data.
+
+## Download Seurat packages (source: https://satijalab.org/seurat/install.html) ~15m
+# Enter commands in R or RStudio
+```{r}
+install.packages('BiocManager')
+BiocManager::install('multtest') 
+# Do you want to install from sources the packages which need compilation? (y/n/cancel); update a/s/n? a
+install.packages('Seurat')
+# package which is only available in source form, and may need compilation? (y/n) Yes
+install.packages("sn")
+library(Seurat)
+# Would you like to install Miniconda? (y/n) Y
+```
+## Download FUSE for macOS to be able to mount to Talapas using sshfs
+Go to this website: https://osxfuse.github.io
+Follow instructions and allow Benjamin Fisher access through System Preferences
+Install Brew packagemanager (source: https://brew.sh): in terminal command, enter: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)" 
+In terminal command, enter: brew install sshfs 
+
+# Mount to talapas
+In terminal command, enter: sshfs gcoffing@talapas-ln1.uoregon.edu:/projects/niell/shared/Octopus /Users/gcoffing/Octopus 
+[In terminal command, enter: sshfs jsongco@talapas-ln1.uoregon.edu:/projects/niell/shared/Octopus /Users/josongco/Octopus]
+Prior to mounting, user will need to create a directory to mount to; in my case, I created the directory "Octopus"
+
+## Set working directory (run this line of code from the console rather than in a chunk)
+```{r}
+setwd("/Users/josongco/Desktop/ABD/FinalSeqData")
+setwd("/Users/gcoffing/Documents/Documents/octo/Seurat")
+```
+
+## Load libraries for Seurat
+```{r}
+# to knit document, use the following command: rmarkdown::render("/Users/josongco/GitHub/Octopolis/Std_CCA.Rmd") ~30m [rename file when saved so code doesn't overwrite while producing next html]
+
+library(Seurat)
+library(Matrix)
+library(ggplot2)
+library(sctransform)
+library(stringr)
+library(cowplot) # used for CCA
+library(patchwork) # used for CCA
+library(dplyr) # used for print markers
+library(plotly) # used for 3D mapping of UMAP
+```
+
+## Set pathway & parameters
+```{r}
+# change depending on user
+user = "mea"
+if (user == "mea"){
+  directoryMaster = "~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/directoryMaster_082321.csv"
+  #full_namekey = "~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/geneIDs_miniNCBI_fulldf_namekey_Sep18_2.csv"
+} else if (user == "gabby"){
+  directoryMaster = "directoryMaster_070720.csv"
+  full_namekey = "fulldf_namekey.csv"
+}
+```
+
+## Read in files
+```{r}
+# read in csv with the directories
+datafiles <- read.csv(directoryMaster, stringsAsFactors = FALSE) 
+data_dir <- as.vector(datafiles$Directory)
+
+# read in csv namekey
+#namekey <- read.csv(full_namekey, stringsAsFactors = FALSE)
+```
+
+## Hashmap for replacing names: Original or Hisat GTF?
+```{r}
+##making a hashmap of OctoGenes/Ocbims to fullnames from the seurat namekey 
+#replace_names = "no"
+#
+#gtf = "hisat"
+#if (gtf == "original") {
+#    unclass(by(namekey, namekey$Ocbimv, function(x) {
+#     tmp <- x$fullname
+#      setNames(tmp, x$Ocbimv[1])
+#     tmp
+#     })) -> namekeyDict
+#} else if (gtf == "hisat"){
+#   unclass(by(namekey, namekey$OctoGene, function(x) {
+#     tmp <- x$fullname
+#     setNames(tmp, x$OctoGene[1])
+#      tmp
+#      })) -> namekeyDict
+#}
+```
+
+## Check that hashmap worked properly
+```{r}
+#if (gtf == "original") {
+##Check that the hashmap is working properly (original gtf)
+#print(namekeyDict[["Ocbimv22027788m"]]) #should print  "NA-OG10040-OB27788"
+#print(namekeyDict[["Ocbimv22030350m"]]) #should print #"Endonuclease-Exonuclease-phosphatase-family-phosphodiesterase-12-OG10002-OB30350" 
+#} else if (gtf == "hisat") {
+##Check that the hashmap is working properly (hisat)
+#print(namekeyDict[["OCTOGene.1"]]) #should print "NA-OG1"
+#print(namekeyDict[["OCTOGene.10032"]]) #should print #"anaphase-promoting-complex-subunit-7-OG10032-OB20676-OB29021"
+#}
+```
+
+## An overview of data processing is as follows:
+1. Read in raw data
+2. Replace names with gene IDS
+3. Create a Seurat object for downstream analyses and data manipulation
+
+# Using a for loop, load in Octo Seq Data and take data through pre-processing steps
+```{r}
+#make empty list for all the seurat objects
+all_list = list() 
+
+ct = 1 #what is ct?
+for(f in 1:2){ #Old or New gtf, NextSeq + HiSeq from directory master, ipa 
+  all <- Read10X(data.dir = data_dir[f+26]) # f+16 for new gtf HiSeq, f+10 for old gtf HiSeq, f+18 for ipa gtf 1 & 2, f+22 for new hisat gtf + transdecoder, f+26 for hifiasm 5 cells, with mito
+  all <- CreateSeuratObject(counts = all, project = paste("Sample", f, sep = ""), min.cells = 3, min.features = 500) # counts = all$'Gene Expression' for hifiasm 4 cells, since Gabby edited
+  all_list[[ct]] = all
+  ct = ct + 1
+}
+
+
+# Check that all names were replaced correctly # does not work for original gtf
+#grep("VGlut",all_list[[1]]@assays[["RNA"]]@data@Dimnames[[1]], ignore.case = TRUE) # prints [1] 2646 5437
+# double check that this is the right gene that you were looking for
+#all_list[[1]]@assays[["RNA"]]@data@Dimnames[[1]][5437] # prints "VGlut-Major-Facilitator-Superfamily-solute-carrier-family-17-sodium-dependent-inorganic-phosphate-cotransporter-member-6-OG8038-OB24718"
+
+saveRDS(all_list, "/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5CellsMitoAnnot_minFeat500_All_list_082321.rds") #change depending on dataset
+  
+# To access individual objects: all_list[[1]]
+#example: all_list[[1]] will print the object information on Seurat object 1
+
+```
+
+### Move on to knitfile RMD (jos_scratch)
+
+
+```{r}
+if (replace_names == 'no'){
+  all_list = list() 
+  ct = 1 #what is ct?
+  for(f in 1:2){ #Old or New gtf, NextSeq + HiSeq from directory master, ipa 
+  all <- Read10X(data.dir = data_dir[f+24]) # f+16 for new gtf HiSeq, f+10 for old gtf HiSeq, f+18 for ipa gtf 1 & 2, f+22 for new hisat gtf + transdecoder
+  all <- CreateSeuratObject(counts = all, project = paste("Sample", f, sep = ""), min.cells = 3, min.features = 750)
+  all_list[[ct]] = all
+  ct = ct + 1
+}
+} else if (replace_names == 'yes'){
+#make empty list for all the seurat objects
+  all_list = list() 
+  ct = 1 #what is ct?
+    for(f in 1:2){ #Old or New gtf, NextSeq + HiSeq from directory master, ipa 
+      all <- Read10X(data.dir = data_dir[f+24]) # f+16 for new gtf HiSeq, f+10 for old gtf HiSeq, f+18 for ipa gtf 1 & 2, f+22 for new hisat gtf + transdecoder
+ngenes <- length(all@Dimnames[[1]])
+    if (gtf == "original"){ #replacing Ocbim names
+      for (g in 1:ngenes){
+        gene <- all@Dimnames[[1]][g]
+        gene <- substr(gene, 6, str_length(gene)-2)
+        ind<- grep(gene, namekey[[3]])
+        if (length(ind)>0) {
+          id <- namekey[[ind[1], 2]]
+          if (str_length(id)>0){
+            id <- str_remove_all(id, "\\(") # parentheses mess up gene names as dimensions
+            id <- str_remove_all(id, "\\)") 
+            id <- substr(id, 1, 60) # keep it short
+            all@Dimnames[[1]][g] <- temp
+        }
+      }
+        } 
+      } else if (gtf == "hisat"){ #replacing Octogene names
+      for (g in 1:ngenes){
+        gene <- all@Dimnames[[1]][g]
+        temp <- namekeyDict[[gene]]
+        if (length(temp) == length(all@Dimnames[[1]][g])){ #This checks that temp is not zero
+         all@Dimnames[[1]][g] <- temp
+         }
+       }
+      }
+  all <- CreateSeuratObject(counts = all, project = paste("Sample", f, sep = ""), min.cells = 3, min.features = 750)
+  all_list[[ct]] = all
+  ct = ct + 1
+}}
+
+# Check that all names were replaced correctly # does not work for original gtf
+grep("VGlut",all_list[[1]]@assays[["RNA"]]@data@Dimnames[[1]], ignore.case = TRUE) # prints [1] 2646 5437
+# double check that this is the right gene that you were looking for
+all_list[[1]]@assays[["RNA"]]@data@Dimnames[[1]][5437] # prints "VGlut-Major-Facilitator-Superfamily-solute-carrier-family-17-sodium-dependent-inorganic-phosphate-cotransporter-member-6-OG8038-OB24718"
+
+saveRDS(all_list, "/Users/josongco/Desktop/ABD/FinalSeqData/ipa_All_list_noname062121.rds") #change depending on dataset
+  
+# To access individual objects: all_list[[1]]
+#example: all_list[[1]] will print the object information on Seurat object 1
+
+```
+
+
+# Data Pre-processing: normalization and integration of data
+```{r}
+## setting parameters: choose which type of normalization, and what kind of integration
+norm = 'sct' # sct = sctransform, std = standard normalization
+integrated = 'yes' # no = straight merge, yes = CCA integration
+
+```
+
+```{r}
+## read in, normalize, and integrate
+all_list <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat250_All_list_081021.rds")  #ipa, new hisat, transdecoder, no names 07/28/2021; hifiASM with mito 080921
+
+if (norm == 'std'){
+  for (i in 1:length(all_list)){
+  all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^[^G]") #preferred for for loop over original command
+   all_list[[i]] <- NormalizeData(all_list[[i]])
+   all_list[[i]] <- FindVariableFeatures(all_list[[i]], selection.method = "vst")} #omit nfeatures = 2000 for 9120 dataset
+nfeat <- VlnPlot(all_list[[i]], features = "nFeature_RNA", pt.size = 0) # VlnPlot(all, features = "nFeature_RNA", y.max = 7000, pt.size = 0)
+ncount <- VlnPlot(all_list[[i]], features = "nCount_RNA", pt.size = 0) # VlnPlot(all, features = "nCount_RNA", y.max = 20000, pt.size = 0)
+pctmt <- VlnPlot(all_list[[i]], features = "percent.mt", pt.size = 0) # VlnPlot(all, features = "percent.mt", y.max = 25, pt.size = 0)
+print(nfeat)
+print(ncount)
+print(pctmt)
+  } else if (norm == 'sct'){
+    for (i in 1:length(all_list)){
+    #all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^[^G]") }
+  all_list <- lapply(X = all_list, FUN = SCTransform, vars.to.regress = "percent.mt")
+  features <- SelectIntegrationFeatures(object.list = all_list, nfeatures = 3000)
+  all_list <- PrepSCTIntegration(object.list = all_list, anchor.features = features)}
+
+
+    
+if (integrated == 'yes'){
+  ## Identify anchors and integrate datasets.
+  if (norm == 'sct') {
+    all.anchors <- FindIntegrationAnchors(object.list = all_list, anchor.features = features, dims = 1:30, normalization.method = "SCT", verbose = TRUE) # can omit dims = 1:30 but   takes a really long time to run; determine if want to keep anchor.features = 2000; omit ndims for 9120 data
+  allnorm.integrated <- IntegrateData(anchorset = all.anchors, normalization.method = "SCT", verbose = TRUE)
+  } else if (norm == 'std'){
+      all.anchors <- FindIntegrationAnchors(object.list = all_list, anchor.features = 2000, dims = 1:30, verbose = TRUE) # can omit dims = 1:30 but   takes a really long time to run; determine if want to keep anchor.features = 2000; omit ndims for 9120 data
+  allnorm.integrated <- IntegrateData(anchorset = all.anchors, verbose = TRUE)
+  }} else if (integrated == 'no'){
+  all <- merge(x = all_list[[1]], y = all_list[[2]], add.cell.ids = c("Sample1", "Sample2"))
+}
+
+all <- allnorm.integrated # omit if using straight merge
+
+saveRDS(all, "/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500_pctmtRegress__081321_SctCCA.rds")
+# change depending on dataset and type of normalization
+
+```
+
+## Setting parameters and visualizing quality of data
+```{r, echo = TRUE}
+## set number of PCS/dims 
+PC = 30
+DM = 1:30
+DMset = 30
+pctmt = 6
+```
+
+
+## Quality control by visualizing through violin and scatter plots
+```{r, echo = FALSE}
+## quality control by visualizing through violin and scatter plots
+# percent mt
+all[["percent.mt"]] <- PercentageFeatureSet(all, pattern = "^[^G]")
+DefaultAssay(all) <- "integrated"
+
+VlnPlot(all, features = "nFeature_RNA", pt.size = 0.00001) # VlnPlot(all, features = "nFeature_RNA", y.max = 7000, pt.size = 0)
+VlnPlot(all, features = "nCount_RNA", pt.size = 0.00001) # VlnPlot(all, features = "nCount_RNA", y.max = 20000, pt.size = 0)
+VlnPlot(all, features = "percent.mt", pt.size = 0.00001) # VlnPlot(all, features = "percent.mt", y.max = 25, pt.size = 0)
+
+
+VlnPlot(all, features = "nFeature_RNA", y.max = 7000, pt.size = 0)
+VlnPlot(all, features = "nCount_RNA", y.max = 20000, pt.size = 0)
+VlnPlot(all, features = "percent.mt", y.max = 10, pt.size = 0)
+
+#percent mt - 13 genes
+#all.genes <- rownames(all@assays$RNA) 
+#mito_genes <- grep("^G", all.genes, invert = TRUE)
+#mito_genes <- all.genes[mito_genes]
+#mito<-gsub("^","MT-",mito)
+
+## visualize the relationship between UMI counts and mitochondrial genes (percent)
+plot1 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "percent.mt", pt.size = 0.0001) & ylim(c(0,20)) & xlim(c(0,5000))
+plot2 <- FeatureScatter(all, feature1 = "nCount_RNA", feature2 = "nFeature_RNA", pt.size = 0.0001) & ylim(c(0,7000)) & xlim(c(0,25000))
+
+## visualize the relationship between genes (ID as >1 UMI) and mitochondrial genes
+plot1
+plot2
+```
+
+```{r, echo = TRUE}
+## subset min.features = 750, 1000
+all <- subset(all, subset = nFeature_RNA > 750 & nFeature_RNA < 7000 & nCount_RNA <10000 & percent.mt < pctmt)
+
+# eval features after subsetting: 
+VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA", "percent.mt", ncol = 3), pt.size = 0)
+```
+
+## RunPCA and plot clusters
+```{r, echo = TRUE}
+all <- ScaleData(all, vars.to.regress = "percent.mt")
+all <- RunPCA(all, npcs = PC, verbose = FALSE)
+#DimHeatmap(all, dims = 1:10, cells = 500, balanced = TRUE)
+#DimHeatmap(all, dims = 1:5, cells = 500, balanced = TRUE)
+#DimHeatmap(all, dims = 6:10, cells = 500, balanced = TRUE)
+#DimHeatmap(all, dims = 11:15, cells = 500, balanced = TRUE)
+#DimHeatmap(all, dims = 16:20, cells = 500, balanced = TRUE)
+#DimHeatmap(all, dims = 21:25, cells = 500, balanced = TRUE)
+#DimHeatmap(all, dims = 26:30, cells = 500, balanced = TRUE)
+
+ElbowPlot(all, ndims = DMset)
+
+#all <- JackStraw(all, dims = DMset) # dims max depends on how many pcs originally calculated
+#all <- ScoreJackStraw(all, dims = DM)
+#JackStrawPlot(all, dims = DM)
+```
+
+```{r echo = FALSE}
+## original clustering
+all <- FindNeighbors(all, dims = DM) 
+all <- FindClusters(all, resolution = 1)
+all <- RunUMAP(all, reduction = "pca", dims = DM)
+DimPlot(all, reduction = "umap", label = TRUE)
+DimPlot(all, reduction = "umap", group.by = "orig.ident")
+```
+
+```{r echo = FALSE}
+## Build a hierarchical tree & plot UMAP
+all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = DM)
+PlotClusterTree(all.tree, label = TRUE)
+#all.tree <- FindNeighbors(all.tree, dims = DM) 
+#all.tree <- FindClusters(all.tree, resolution = 1)
+#all.tree <- RunUMAP(all.tree, dims = DM)
+DimPlot(all.tree, reduction = "umap", label = TRUE)
+DimPlot(all.tree, reduction = "umap", group.by = "orig.ident")
+FeaturePlot(all.tree, features="nCount_RNA", label = TRUE) # source: https://www.biostars.org/p/469452/
+FeaturePlot(all.tree, features="nFeature_RNA", label = TRUE)
+FeaturePlot(all.tree, features="percent.mt", label = TRUE) 
+
+#ncount <- FeaturePlot(all.tree, features="nCount_RNA", label = TRUE)
+#ncount <- ncount + scale_color_gradientn( colours = c('lightgrey', 'blue'),  limits = c(1000, 5000))
+#print(ncount)
+#ncount <- ncount + scale_color_gradientn( colours = c('lightgrey', 'blue'),  limits = c(5000, 10000))
+#print(ncount)
+
+#nfeat <- FeaturePlot(all.tree, features="nFeature_RNA", label = TRUE)
+#nfeat <- nfeat + scale_color_gradientn( colours = c('lightgrey', 'blue'),  limits = c(0, 1500))
+#print(nfeat)
+
+
+#mito <- FeaturePlot(all.tree, features="percent.mt", label = TRUE)
+#mito <- mito + scale_color_gradientn( colours = c('lightgrey', 'blue'),  limits = c(6, 15))
+#print(mito)
+
+# commands commented out to allow renumbering clusters like dendrogram
+
+
+## Build a hierarchical tree & plot UMAP
+#mito7.5.tree <- BuildClusterTree(mito7.5, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = DM)
+#PlotClusterTree(mito7.5.tree, label = TRUE)
+#all.tree <- FindNeighbors(all.tree, dims = DM) 
+#all.tree <- FindClusters(all.tree, resolution = 1)
+#all.tree <- RunUMAP(all.tree, dims = DM)
+#DimPlot(mito7.5.tree, reduction = "umap", label = TRUE)
+#DimPlot(mito7.5.tree, reduction = "umap", group.by = "orig.ident")
+#FeaturePlot(mito7.5.tree, features="nCount_RNA", label = TRUE) # source: https://www.biostars.org/p/469452/
+#FeaturePlot(mito7.5.tree, features="nFeature_RNA", label = TRUE)
+#FeaturePlot(mito7.5.tree, features="percent.mt", label = TRUE)
+
+# commands commented out to allow renumbering clusters like dendrogram
+
+#mito6.tree <- BuildClusterTree(mito6, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = DM)
+#PlotClusterTree(mito6.tree, label = TRUE)
+#all.tree <- FindNeighbors(all.tree, dims = DM) 
+#all.tree <- FindClusters(all.tree, resolution = 1)
+#all.tree <- RunUMAP(all.tree, dims = DM)
+#DimPlot(mito6.tree, reduction = "umap", label = TRUE)
+#DimPlot(mito6.tree, reduction = "umap", group.by = "orig.ident")
+#FeaturePlot(mito6.tree, features="nCount_RNA", label = TRUE) # source: https://www.biostars.org/p/469452/
+#FeaturePlot(mito6.tree, features="nFeature_RNA", label = TRUE)
+
+```
+
+
+## Examine cell-cluster information & cluster features
+```{r, echo = FALSE}
+id_cell <- table(Idents(all.tree))
+barplot(id_cell, main = "cell # in each cluster", xlab = "cluster ID")
+#table(all.tree$orig.ident)
+#prop.table(table(Idents(all.tree)))
+id_runs <- table(all.tree$orig.ident, Idents(all.tree))
+#barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "palegreen3", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # all runs
+barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # v3 chem = 2 samples
+
+VlnPlot(all.tree, features = "nCount_RNA", y.max = 10000, pt.size = 0, ncol = 1) + NoLegend()
+VlnPlot(all.tree, features = "nFeature_RNA", y.max = 4000, pt.size = 0, ncol = 1) + NoLegend()
+VlnPlot(all.tree, features = "percent.mt", y.max = 20, pt.size = 0, ncol = 1) + NoLegend()
+```
+
+## Identify cluster and node markers based on denodrogram renumbering
+```{r, echo = FALSE, eval = FALSE}
+## cluster markers
+markers_list = list()
+for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){
+  markersROC <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
+  markersROC <- setNames(cbind(rownames(markersROC), markersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
+  markersROC$diff_exp <- (markersROC$pct.1/markersROC$pct.2)
+  markersROC <- markersROC[order(-markersROC$diff_exp),]
+  header <- paste("Cluster", all.tree$seurat_clusters[m], sep = " ")
+  top5markers <- paste((head(markersROC$geneID, n = 5)))
+  marker_output <- c(header, top5markers)
+  print(marker_output)
+  markers_list[m] = markersROC
+  #features_df <- data.frame(Col1 = rep(all.tree$seurat_clusters[m], 5), Col2 = top5markers[m]) 
+   #     print(head(features_df))
+    #    features_df.merged <- features_df[m] %>%
+     #       dplyr::group_by(Col1) %>%
+      #      dplyr::summarize(Col2 = paste(features_df$Col2, collapse = ","))
+  #print(head(features_df.merged))
+  #print(DotPlot(all.tree, features = features_df.merged$Col2)+ RotatedAxis()) # can ID which cluster to view genes
+}
+
+# write.csv(markers_list, "/Users/josongco/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/clustermarkers9120.csv") #9120 indicates dataset
+```
+
+```{r echo = FALSE, eval = FALSE}
+## ID markers for nodes/connecting points of dendogram
+# error: Error in WhichCells.Seurat(object = object, idents = ident.2) : 
+  # continued Cannot find the following identities in the object: 43
+nodes <- unique(all.tree@tools$BuildClusterTree$edge[,1])
+node_markers = list()
+for (n in 1:length(nodes)){
+  nodemarkersROC <- FindMarkers(all.tree, ident.1 = "clustertree", ident.2 = nodes[n], logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
+  nodemarkersROC <- setNames(cbind(rownames(nodemarkersROC), nodemarkersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
+  nodemarkersROC$diff_exp <- (nodemarkersROC$pct.1/nodemarkersROC$pct.2)
+  nodemarkersROC <- nodemarkersROC[order(-nodemarkersROC$diff_exp),]
+  node_markers[[n]] = nodemarkersROC
+  node_header <- paste("Node", nodes[n], sep = " ")
+  top5nodemarkers <- paste(head(nodemarkersROC$geneID, n = 5))
+  nodemarker_output <- c(node_header, top5nodemarkers)
+  print(nodemarker_output)
+  
+  # nodefeatures_df <- data.frame(Col1 = rep(nodes[n], 5), Col2 = top5nodemarkers, stringsAsFactors = FALSE) 
+  #print(head(nodefeatures_df))
+   #nodefeatures_df.merged <- nodefeatures_df %>%
+  #    dplyr::group_by(Col1) %>%
+  #    dplyr::summarize(Col2 = paste(nodefeatures_df$Col2, collapse = ","))
+  #      print(head(nodefeatures_df.merged))
+  #node_markers[n] = nodefeatures_df.merged
+  #node_dp <- DotPlot(all.tree, features = nodefeatures_df.merged$Col2)+ RotatedAxis() # unable to find genes
+  #print(node_dp)
+}
+
+
+#write.csv(node_markers, "/Users/josongco/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/nodemarkers9120.csv") #9120 indicates dataset
+```
+
+
+## Replace labels on figures to include gene ID + name
+```{r, echo = FALSE}
+replaceLabelsX <- function(p,genelabels,namelist){
+  pp<- ggplot_build(p)
+  oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x$breaks
+  newxlabels = oldxlabels
+  for (i in 1:length(oldxlabels)){
+    loc<-grep(oldxlabels[[i]],genelabels)
+    newxlabels[[i]] = paste(oldxlabels[[i]], "-", namelist[[loc]])
+  }
+ p<- p + scale_x_discrete(labels = newxlabels)
+}
+```
+
+
+## Plot features based on candidate genes
+```{r, echo = FALSE}
+## transdecoder gtf
+
+#yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - Neuro.csv",stringsAsFactors=FALSE)
+#yfg <- yfg[!apply(yfg == "", 1, all),] # turn blank rows in NA
+yfg <- read.csv("~josongco/Desktop/blastTest.csv",stringsAsFactors=FALSE) # change gene list depending on genes of interest
+
+all.genes <- rownames(all.tree@assays$RNA) 
+DefaultAssay(all.tree) <- "RNA"
+
+genelist <- vector()
+namelist <- vector()
+genelabels <- vector()
+nomatch <- list()
+for (i in 1:nrow(yfg)){
+  gene <- yfg[[i,3]]
+  #print(gene)
+  # gene<-gsub("\\..*","",gene) not needed for Gabby's updated hifiasm 
+  #loc <- grep(gene,all.genes, fixed = TRUE)
+   loc <- which(all.genes ==gene)
+  if (length(loc)>0 & str_length(gene)>0) {
+    genelist <- c(genelist,loc)
+    namelist <- c(namelist, yfg[[i,1]])
+    genelabels<-c(genelabels, all.genes[[loc]])
+  } else {
+    nomatch <- c(nomatch,yfg[[i,3]])
+  }
+  #print(genelist)
+}
+
+p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()
+p<-replaceLabelsX(p,genelabels,namelist)
+p
+
+# fp <- FeaturePlot(all.tree, features = all.genes[genelist[1]], ncol = 1) + NoLegend() + NoAxes() 
+# scale_color_gradientn( colours = c('lightgrey', 'blue'),  limits = c(1, 8))
+
+for (i in 1:length(genelist)){
+  fp <- FeaturePlot(all.tree, features = all.genes[genelist[i]], ncol = 1) + NoAxes()
+  fp <- fp+ ggtitle(namelist[i])
+  print(fp)
+}
+```
+
+```{r, echo = FALSE, eval = FALSE}
+## transdecoder gtf, mito cutoff 7.5, 6
+
+DefaultAssay(mito7.5.tree) <- "RNA"
+
+p<-DotPlot(mito7.5.tree,features=rev(all.genes[genelist])) + RotatedAxis()
+p<-replaceLabelsX(p,genelabels,namelist)
+p
+
+FeaturePlot(mito7.5.tree, features = all.genes[genelist[1:2]], ncol = 1) + NoLegend() + NoAxes() 
+FeaturePlot(mito7.5.tree, features = all.genes[genelist[3:4]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(mito7.5.tree, features = all.genes[genelist[5:6]], ncol = 1) + NoLegend() + NoAxes()
+
+
+DefaultAssay(mito6.tree) <- "RNA"
+
+p<-DotPlot(mito6.tree,features=rev(all.genes[genelist])) + RotatedAxis()
+p<-replaceLabelsX(p,genelabels,namelist)
+p
+
+FeaturePlot(mito6.tree, features = all.genes[genelist[1:2]], ncol = 1) + NoLegend() + NoAxes() 
+FeaturePlot(mito6.tree, features = all.genes[genelist[3:4]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(mito6.tree, features = all.genes[genelist[5:6]], ncol = 1) + NoLegend() + NoAxes()
+```
+
+
+```{r echo = FALSE, eval = FALSE}
+## HISAT GTF
+## 
+yfg <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE) # change gene list depending on genes of interest
+
+all.genes <- rownames(all.tree@assays$RNA) 
+
+genelist <- vector()
+nomatch <- list()
+for (i in 1:12){
+  gene <- yfg[[i,2]]
+  gene<-substr(gene,10,str_length(gene))
+  gene<- paste("OB", gene, sep = "")
+  loc <- grep(gene,all.genes)
+  if (length(loc)>0) {
+    genelist <- c(genelist,loc)
+  } else {
+    nomatch <- c(nomatch,yfg[[i,2]])
+  }
+}
+
+# hisat file was not able to find the following: 
+# "Ocbimv22021175" = synaptotagmin OG.20163
+# "Ocbimv22024718" = VGlut 
+# "Ocbimv22017369" = TH OG.16681
+# "Ocbimv22001324" = FMRF-amide OG.28623
+# "Ocbimv22031264" = TyrBH OG.41051
+
+DefaultAssay(all.tree) <- "RNA"
+
+DotPlot(all.tree,features=rev(all.genes[genelist[1:7]])) + RotatedAxis()
+DotPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051")) #synaptotagmin, TH, FMRF-amide, TyrBH)
+
+FeaturePlot(all.tree, features = all.genes[genelist[1:2]], ncol = 1) + NoLegend() + NoAxes() 
+FeaturePlot(all.tree, features = all.genes[genelist[3:4]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(all.tree, features = all.genes[genelist[5:6]], ncol = 1) + NoLegend() + NoAxes()
+
+FeaturePlot(all.tree, features = all.genes[genelist[8:10]], ncol = 1) + NoLegend() + NoAxes()
+FeaturePlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051"), ncol = 1)
+
+FeaturePlot(all.tree,features = "G19145") #synaptotagmin 
+FeaturePlot(all.tree,features = "G22265") #AchE
+
+FeaturePlot(all.tree,features = "G15035") #VAchT 1
+
+FeaturePlot(all.tree,features = "G31664") #ChaT 1
+
+FeaturePlot(all.tree,features = "G9223") #VGlut 1
+
+FeaturePlot(all.tree,features = "G19400") #TH 
+FeaturePlot(all.tree,features = "G31304") #DAT 
+FeaturePlot(all.tree,features = "G28781") #VMAT-A
+FeaturePlot(all.tree,features = "G1560") #FMRF-related 1
+
+FeaturePlot(all.tree,features = "G3369") #FMRFamide 1
+
+FeaturePlot(all.tree,features = "G20534") #TyrBH
+FeaturePlot(all.tree,features = "G7577") #"pcd" cadherin
+
+FeaturePlot(all.tree,features = "G10501") #GAD
+FeaturePlot(all.tree,features = "G15315") #cadherin25965
+#FeaturePlot(all.tree,features = "G13864") #cadherin00175
+FeaturePlot(all.tree,features = "G29198") #sox
+FeaturePlot(all.tree,features = "G6241") #Grik1L
+FeaturePlot(all.tree,features = "G17622") #GluR4
+FeaturePlot(all.tree,features = "G209") #AnionicAchR
+FeaturePlot(all.tree,features = "G27523") #AchR00748
+FeaturePlot(all.tree,features = "G7578") #cadherin03826
+FeaturePlot(all.tree,features = "G4155") #AchR09305
+
+FeaturePlot(all.tree,features = "G31664") #Chat
+FeaturePlot(all.tree,features = "G7577") #Cad
+#FeaturePlot(all.tree,features = "G3517") #AchR06518
+
+
+FeaturePlot(all.tree,features = "G22002") #TBP
+FeaturePlot(all.tree,features = "G27360") #Elav
+
+FeaturePlot(all.tree,features = "G10710") #UBC
+#FeaturePlot(all.tree,features = "G3522") #Ocbimv29097
+#FeaturePlot(all.tree,features = "G3522") #AchR29099
+FeaturePlot(all.tree,features = "G22261") #tryptophan
+#FeaturePlot(all.tree,features = "G3517") #5HT
+FeaturePlot(all.tree,features = "G20534") #TBH
+#FeaturePlot(all.tree,features = "G34355") #Ocbimv33185
+FeaturePlot(all.tree,features = "G27061") #Polr2a
+#FeaturePlot(all.tree,features = "G23077") #serine/threonine
+
+VlnPlot(all.tree, features = all.genes[genelist[1:4]], ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
+VlnPlot(all.tree, features = all.genes[genelist[5:7]], ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
+VlnPlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051"), pt.size = 0, ncol = 1)
+
+#grep("glut",all.genes)
+ #[1]  2034  4008  4599 10227 12291 14312 18187 19855 19948 27719 32028 40993 41561
+
+#VlnPlot(all.tree,features = c(all.genes[2034],all.genes[4008], all.genes[4599], all.genes[10227]), pt.size = 0, ncol = 1) 
+#VlnPlot(all.tree, features = c(all.genes[12291], all.genes[14312], all.genes[18187], all.genes[19855]), pt.size = 0, ncol = 1) 
+#VlnPlot(all.tree, features  = c(all.genes[19948], all.genes[27719], all.genes[32028], all.genes[40993], all.genes[41561]), pt.size = 0, ncol = 1) # glut
+
+# Can also use line of code below to find candidate gene 
+#FeaturePlot(all.tree,features = all.genes[grep("VGlut",all.genes)])
+#FeaturePlot(all.tree,features = all.genes[grep("glut",all.genes)]) * use this one
+```
+
+
+## 3D representation of UMAP
+# source: https://github.com/Dragonmasterx87/Interactive-3D-Plotting-in-Seurat-3.0.0/blob/master/3D%20UMAP%20Plotting%20v1.3.R
+```{r, echo = FALSE, eval = FALSE}
+## align colors (source: https://github.com/satijalab/seurat/issues/257)
+# Load the "scales" package
+require(scales)
+
+# Create vector with levels of object@ident
+identities <- levels(all.tree@active.ident)
+
+# Create vector of default ggplot2 colors
+my_color_palette <- hue_pal()(length(identities))
+
+# Plot the tSNE plot with the default ggplot2 colors
+DimPlot(object = all.tree, label = TRUE) + 
+  scale_color_manual(values = my_color_palette)
+
+# Re-run UMAPs that you have accurate calculations for all UMAP(s)
+all3D <- RunUMAP(all.tree, dims = DM, n.components = 3L)
+
+# Extract tSNE information from Seurat Object
+umap_1 <- all3D[["umap"]]@cell.embeddings[,1]
+umap_2 <- all3D[["umap"]]@cell.embeddings[,2]
+umap_3 <- all3D[["umap"]]@cell.embeddings[,3]
+
+# Visualize what headings are called so that you can extract them to form a dataframe
+Embeddings(object = all3D, reduction = "umap")
+
+# Prepare a dataframe for cell plotting
+plot.data <- FetchData(object = all3D, vars = c("UMAP_1", "UMAP_2", "UMAP_3", "seurat_clusters"))
+
+# Make a column of row name identities (these will be your cell/barcode names)
+plot.data$label <- paste(rownames(plot.data))
+
+# Plot your data, colors are in the original clustering and not in the order of all.tree dendrogram clustering - fix this in the future!
+fig <- plot_ly(data = plot.data, 
+        x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3,
+        color = all.tree@meta.data$seurat_clusters,
+        colors = c("#F8766D", 
+"#F27D53",
+"#EA8331",
+"#E28A00",
+"#D89000",
+"#CD9600",
+"#C09B00",
+"#B2A000",
+"#A3A500",
+"#91AA00",
+"#7CAE00",
+"#61B200",
+"#39B600",
+"#00B92A",
+"#00BB4E",
+"#00BE67",
+"#00BF7D",
+"#00C091",
+"#00C1A3",
+"#00C0B4",
+"#00BFC4",
+"#00BDD3",
+"#00BAE0",
+"#00B5EC",
+"#00B0F6",
+"#00A9FF",
+"#35A2FF",
+"#7099FF",
+"#9590FF",
+"#B186FF",
+"#C77CFF",
+"#D973FC",
+"#E76BF3",
+"#F265E8",
+"#FA62DB",
+"#FF61CC",
+"#FF62BC",
+"#FF65AA",
+"#FF6A98",
+"#FF6C91"), # change when re-doing clusters
+        type = "scatter3d", 
+        mode = "markers", 
+        marker = list(size = 5, width=2), # controls size of points
+        text=~label, #This is that extra column we made earlier for which we will use for cell ID
+        hoverinfo="text")  #When you visualize your plotly object, hovering your mouse pointer over a point shows cell names
+
+
+
+# Updates stemming from Issue #9 Having a fixed scale on axes while selecting particular clusters
+# @rtoddler thanks for the suggestions!
+# Before you plot, set the ranges of the axis you desire. This set axis range will be 
+# present across all clusters, and plotly will not adjust for axis length anymore
+# this axis length will persist even when selecting some clusters
+
+# xaxis
+axx <- list(
+  nticks = 4,
+  range = c(-10,10) #select range of xaxis
+)
+
+# yaxis
+axy <- list(
+  nticks = 4,
+  range = c(-10,10) #select range of yaxis
+)
+
+#zaxis
+axz <- list(
+  nticks = 4,
+  range = c(-10,10) #select range of zaxis
+)
+
+fig <- fig %>% layout(scene = list(xaxis=axx,yaxis=axy,zaxis=axz))
+fig_cube <- fig %>% layout(scene = list(xaxis=axx,yaxis=axy,zaxis=axz, aspectmode='cube')) # To maintain cubic aspect
+fig
+fig_cube
+```
+

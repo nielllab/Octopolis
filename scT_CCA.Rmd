@@ -27,6 +27,7 @@ library(patchwork) # used for CCA
 ```{r, echo = FALSE, eval = FALSE} 
 ##### ORIG GTF
 all_list <- readRDS("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/all_list.rds")
+all_list <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/ipa_All_list_noname062121.rds")
 for (i in 1:length(all_list)){
   #all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command
   all_list[[i]] <- SCTransform(all_list[[i]], verbose = FALSE)
@@ -190,6 +191,7 @@ all <- subset(all, subset = nFeature_RNA > 750 & nFeature_RNA < 7000 & nCount_RN
 #VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0) + NoLegend() 
 VlnPlot(all, features = c("nCount_RNA"), pt.size = 0, y.max = 30000) + NoLegend() 
 VlnPlot(all, features = c("nFeature_RNA"), pt.size = 0, y.max = 7500) + NoLegend()
+# can also use the following code to keep figures in one panel: VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
 ```
 
 ## Run PCA and generate UMAP
@@ -209,10 +211,10 @@ JackStrawPlot(all, dims = DM)
 
 ```{r echo = FALSE}
 # original clustering
-all <- RunUMAP(all, reduction = "pca", dims = DM) #vignette places UMAP before neighbors/clusters
 all <- FindNeighbors(all, dims = DM) 
-all <- FindClusters(all, resolution = 1) # can omit resolution
-DimPlot(all, reduction = "umap", label = TRUE) + NoLegend()
+all <- FindClusters(all, resolution = 1)
+all <- RunUMAP(all, reduction = "pca", dims = DM)
+DimPlot(all, reduction = "umap", label = TRUE)
 DimPlot(all, reduction = "umap", group.by = "orig.ident")
 ```
 
@@ -220,7 +222,10 @@ DimPlot(all, reduction = "umap", group.by = "orig.ident")
 ```{r echo = FALSE}
 all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = DM)
 PlotClusterTree(all.tree, label = TRUE)
-DimPlot(all.tree, reduction = "umap", label = TRUE) + NoLegend()
+all.tree <- FindNeighbors(all.tree, dims = DM) 
+all.tree <- FindClusters(all.tree, resolution = 1)
+all.tree <- RunUMAP(all.tree, dims = DM)
+DimPlot(all.tree, reduction = "umap", label = TRUE)
 DimPlot(all.tree, reduction = "umap", group.by = "orig.ident")
 ```
 
@@ -243,21 +248,21 @@ VlnPlot(all.tree, features = "nFeature_RNA", y.max = 7500, pt.size = 0, ncol = 1
 ## ID cluster markers based on dendogram renumbering
 ```{r, echo = FALSE} 
 markers_list = list()
-for (m in 1:nlevels((all.tree$seurat_clusters))){
-  markersROC <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.5, test.use = "roc", only.pos = TRUE)
+for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){
+  markersROC <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
   markersROC <- setNames(cbind(rownames(markersROC), markersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
   markersROC$diff_exp <- (markersROC$pct.1/markersROC$pct.2)
-  markersROC <- markersROC[order(-markersROC$power),]
-  header <- paste("Cluster", m, sep = " ")
+  markersROC <- markersROC[order(-markersROC$diff_exp),]
+  header <- paste("Cluster", all.tree$seurat_clusters[m], sep = " ")
   top5markers <- paste((head(markersROC$geneID, n = 5)))
   marker_output <- c(header, top5markers)
-  #print(marker_output) # leave out for html knit
+  print(marker_output)
   markers_list[m] = markersROC
   
-  p<-DotPlot(all.tree,features=rev(head(markersROC$geneID,50))) + RotatedAxis()
-p<- trimLabelsX(p,20)
-p<- p + labs(title = header)
-print(p)
+ # p<-DotPlot(all.tree,features=rev(head(markersROC$geneID,50))) + RotatedAxis()
+#p<- trimLabelsX(p,20)
+#p<- p + labs(title = header)
+#print(p)
 }
 
 # write.csv(markers_list, "/Users/josongco/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/clustermarkers9120.csv") #9120 indicates dataset

@@ -66,7 +66,8 @@ all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeq_hisat.rds") #HiS
 all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqTrim_hisat.RDS") #HiSeqTrim
 all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqCombined_hisat.rds") #HiSeqCombined
 all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/hisatAll_list9120.rds") #HiSeqCombined updated gene names 09/01/2020
-
+all_list <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/ipa_All_list_noname062121.rds")  #ipa gene model, no names 06/21/2021
+all_list <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/newHisatTransdecoder_All_list_noname072821.rds") #ipa, new hisat, transdecoder, no names 07/28/2021
 
 for (i in 1:length(all_list)){
   #all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^mitochondria-") #preferred for for loop over original command
@@ -80,7 +81,7 @@ saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/Hisat_allStd.rds") # not
 all_list <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_allStd.rds") # not necessary for HiSeq data
 
 ## Identify anchors and integrate datasets.
-all.anchors <- FindIntegrationAnchors(object.list = all_list, anchor.features = 2000, verbose = TRUE) # can omit dims = 1:30 but takes a really long time to run; determine if want to keep anchor.features = 2000; omit ndims for 9120 data
+all.anchors <- FindIntegrationAnchors(object.list = all_list, anchor.features = 2000, dims = 1:30, verbose = TRUE) # can omit dims = 1:30 but takes a really long time to run; determine if want to keep anchor.features = 2000; omit ndims for 9120 data
 allnorm.integrated <- IntegrateData(anchorset = all.anchors, verbose = TRUE)
 
 saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_allStdCCA.rds")
@@ -88,6 +89,7 @@ saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqStd
 saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqTrimStdCCA.rds")
 saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombinedStdCCA.rds")
 saveRDS(allnorm.integrated, "/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds") #omit nfeatures = 2000, ndims = 1:30 for 9120 dataset
+saveRDS(allnorm.integrated, "/Users/josongco/Desktop/ABD/FinalSeqData/ipa_integrated_nonames_062121_StdCCA.rds")
 
 ###### v3 dataset
 ## Identify anchors and integrate datasets. 
@@ -153,12 +155,12 @@ DMset = 30
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_allStd_str8.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqTrimStdCCA.rds")
-#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/HiSeqCombinedStdCCA.rds")
+all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/HiSeqCombinedStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqTrimStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombinedStdCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiseqCombinedStd_str8.rds")
-all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/FinalSeqData/Hisat_HiSeqCombined9120StdCCA.rds")
 
 DefaultAssay(all) <- "integrated" #omit if using straight merge
 ```
@@ -194,12 +196,12 @@ VlnPlot(all, features = c("nFeature_RNA", "nCount_RNA"), pt.size = 0, ncol = 2)
 all <- ScaleData(all)
 all <- RunPCA(all, npcs = PC, verbose = FALSE)
 DimHeatmap(all, dims = 1:10, cells = 500, balanced = TRUE)
-#DimHeatmap(all, dims = 1:5, cells = 500, balanced = TRUE)
-#DimHeatmap(all, dims = 6:10, cells = 500, balanced = TRUE)
-#DimHeatmap(all, dims = 11:15, cells = 500, balanced = TRUE)
-#DimHeatmap(all, dims = 16:20, cells = 500, balanced = TRUE)
-#DimHeatmap(all, dims = 21:25, cells = 500, balanced = TRUE)
-#DimHeatmap(all, dims = 26:30, cells = 500, balanced = TRUE)
+DimHeatmap(all, dims = 1:5, cells = 500, balanced = TRUE)
+DimHeatmap(all, dims = 6:10, cells = 500, balanced = TRUE)
+DimHeatmap(all, dims = 11:15, cells = 500, balanced = TRUE)
+DimHeatmap(all, dims = 16:20, cells = 500, balanced = TRUE)
+DimHeatmap(all, dims = 21:25, cells = 500, balanced = TRUE)
+DimHeatmap(all, dims = 26:30, cells = 500, balanced = TRUE)
 
 ElbowPlot(all, ndims = DMset)
 
@@ -239,14 +241,13 @@ id_runs <- table(all.tree$orig.ident, Idents(all.tree))
 barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("lightcoral", "steelblue1"), legend = rownames(id_runs), beside=TRUE) # v3 chem
 
 VlnPlot(all.tree, features = "nCount_RNA", y.max = 20000, pt.size = 0, ncol = 1)
-VlnPlot(all.tree, features = "nFeature_RNA", y.max = 20000, pt.size = 0, ncol = 1)
+VlnPlot(all.tree, features = "nFeature_RNA", y.max = 5000, pt.size = 0, ncol = 1)
 ```
 
 ## ID cluster markers based on dendogram renumbering
 ```{r, echo = TRUE, eval = FALSE} 
-# error: Cannot find the following identities in the object: 43
 markers_list = list()
-for (m in 1:nlevels((all.tree$seurat_clusters))){
+for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){
   markersROC <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
   markersROC <- setNames(cbind(rownames(markersROC), markersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
   markersROC$diff_exp <- (markersROC$pct.1/markersROC$pct.2)
@@ -301,7 +302,8 @@ for (n in 1:length(nodes)){
 ```
 
 ## Plot features
-````{r, echo = FALSE, eval = FALSE}
+````{r, echo = FALSE, eval = TRUE}
+## ORIG GTF
 ####change eval = FALSE when using HiSat
 yfg <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
 
@@ -340,8 +342,38 @@ VlnPlot(all.tree,features = all.genes[genelist[9:12]], ncol = 1, pt.size = 0) + 
 #FeaturePlot(all.tree,features = all.genes[grep("VGlut",all.genes)])
 ```
 
+```{r}
+## transdecoder gtf
+
+
+yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - Neuro.csv",stringsAsFactors=FALSE)
+
+all.genes <- rownames(all.tree@assays$RNA) 
+
+genelist <- vector()
+nomatch <- list()
+for (i in 1:10){
+  gene <- yfg[[i,2]]
+  loc <- grep(gene,all.genes)
+  if (length(loc)>0) {
+    genelist <- c(genelist,loc)
+  } else {
+    nomatch <- c(nomatch,yfg[[i,2]])
+  }
+}
+
+DotPlot(all.tree,features=rev(all.genes[genelist[1:7]])) + RotatedAxis()
+
+  gene<-gsub("\\..*","",gene)
+  gene <- paste(yfg$Transdecoder.Gene.ID, "-", yfg$Gene)
+
+```
+
+
+
 ```{r echo = FALSE, eval = FALSE}
 ## USE ME
+## ## HISAT GTF
 #### change eval = FALSE when using Orig GTF
 
 yfg <- read.csv("~/GDrive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/Genes for in situ.csv",stringsAsFactors=FALSE)
@@ -379,6 +411,55 @@ FeaturePlot(all.tree, features = all.genes[genelist[1:2]], ncol = 1) + NoLegend(
 FeaturePlot(all.tree, features = all.genes[genelist[3:4]], ncol = 1) + NoLegend() + NoAxes()
 FeaturePlot(all.tree, features = all.genes[genelist[5:7]], ncol = 1) + NoLegend() + NoAxes()
 FeaturePlot(all.tree, features = c("OG.20163", "OG.16681", "OG.28623", "OG.41051"), ncol = 1)
+
+FeaturePlot(all.tree,features = all.genes[grep("G19145",all.genes)]) #synaptotagmin 
+FeaturePlot(all.tree,features = all.genes[grep("G22265",all.genes)]) #AchE
+
+FeaturePlot(all.tree,features = all.genes[grep("G15035",all.genes)]) #VAchT 1
+
+FeaturePlot(all.tree,features = all.genes[grep("31664",all.genes)]) #ChaT 1
+
+FeaturePlot(all.tree,features = all.genes[grep("G9223",all.genes)]) #VGlut 1
+
+FeaturePlot(all.tree,features = all.genes[grep("G19400",all.genes)]) #TH 
+FeaturePlot(all.tree,features = all.genes[grep("G31304",all.genes)]) #DAT 
+FeaturePlot(all.tree,features = all.genes[grep("G28781",all.genes)]) #VMAT-A
+FeaturePlot(all.tree,features = all.genes[grep("G1560",all.genes)]) #FMRF-related 1
+
+FeaturePlot(all.tree,features = all.genes[grep("G3369",all.genes)]) #FMRFamide 1
+
+FeaturePlot(all.tree,features = all.genes[grep("G20534",all.genes)]) #TyrBH
+FeaturePlot(all.tree,features = all.genes[grep("G7577",all.genes)]) #"pcd" cadherin
+
+FeaturePlot(all.tree,features = all.genes[grep("G10501",all.genes)]) #GAD
+FeaturePlot(all.tree,features = all.genes[grep("G15315",all.genes)]) #cadherin25965
+#FeaturePlot(all.tree,features = all.genes[grep("G13864",all.genes)]) #cadherin00175
+FeaturePlot(all.tree,features = all.genes[grep("G29198",all.genes)]) #sox
+FeaturePlot(all.tree,features = all.genes[grep("G6241",all.genes)]) #Grik1L
+FeaturePlot(all.tree,features = all.genes[grep("G17622",all.genes)]) #GluR4
+FeaturePlot(all.tree,features = all.genes[grep("G209.",all.genes)]) #AnionicAchR
+FeaturePlot(all.tree,features = "G209") #AchR09305
+FeaturePlot(all.tree,features = all.genes[grep("27523",all.genes)]) #AchR00748
+FeaturePlot(all.tree,features = all.genes[grep("G7578",all.genes)]) #cadherin03826
+FeaturePlot(all.tree,features = all.genes[grep("G4155",all.genes)]) #AchR09305
+
+FeaturePlot(all.tree,features = all.genes[grep("G31664",all.genes)]) #Chat
+FeaturePlot(all.tree,features = all.genes[grep("G7577",all.genes)]) #Cad
+#FeaturePlot(all.tree,features = all.genes[grep("G3517",all.genes)]) #AchR06518
+
+
+FeaturePlot(all.tree,features = all.genes[grep("G22002",all.genes)]) #TBP
+FeaturePlot(all.tree,features = all.genes[grep("G27360",all.genes)]) #Elav
+
+FeaturePlot(all.tree,features = all.genes[grep("G10710",all.genes)]) #UBC
+#FeaturePlot(all.tree,features = all.genes[grep("G3522",all.genes)]) #Ocbimv29097
+#FeaturePlot(all.tree,features = all.genes[grep("G3522",all.genes)]) #AchR29099
+FeaturePlot(all.tree,features = all.genes[grep("G22261",all.genes)]) #tryptophan
+#FeaturePlot(all.tree,features = all.genes[grep("G3517",all.genes)]) #5HT
+FeaturePlot(all.tree,features = all.genes[grep("G20534",all.genes)]) #TBH
+#FeaturePlot(all.tree,features = all.genes[grep("G34355",all.genes)]) #Ocbimv33185
+FeaturePlot(all.tree,features = all.genes[grep("G27061",all.genes)]) #Polr2a
+#FeaturePlot(all.tree,features = all.genes[grep("G23077",all.genes)]) #serine/threonine
 
 VlnPlot(all.tree, features = all.genes[genelist[1:4]], ncol = 1, pt.size = 0) + NoLegend() + NoAxes()
 VlnPlot(all.tree, features = all.genes[genelist[5:7]], ncol = 1, pt.size = 0) + NoLegend() + NoAxes()

@@ -1,0 +1,351 @@
+---
+title: "hifiasm-5cells gtf: standard norm with CCA integration, 30pcs/unlmtd, with no mt regression during normalization, %mt <6, ncount > 1000 & <20000, nfeat > 600"
+author: "jos"
+date: "8/24/2021"
+output: 
+  html_document:
+    fig_height: 12
+    fig_width: 17
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = FALSE}
+# to knit document, use the following command: rmarkdown::render("/Users/josongco/Desktop/ABD/FinalSeqData/jos_scratch.Rmd") ~30m [rename file when saved so code doesn't overwrite while producing next html]
+
+library(Seurat)
+library(Matrix)
+library(ggplot2)
+library(sctransform)
+library(stringr)
+library(cowplot) # used for CCA
+library(patchwork) # used for CCA
+library(dplyr) # used for print markers
+library(plotly) # used for 3D mapping of UMAP
+```
+
+
+```{r, echo = TRUE, eval = TRUE}
+all_list <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5CellsMitoAnnot_minFeat500_All_list_082321.rds")
+
+for (i in 1:length(all_list)){
+  all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^[^G]")
+
+  nfeat <- VlnPlot(all_list[[i]], features = "nFeature_RNA", pt.size = 0) # VlnPlot(all, features = "nFeature_RNA", y.max = 7000, pt.size = 0)
+  ncount <- VlnPlot(all_list[[i]], features = "nCount_RNA", pt.size = 0) # VlnPlot(all, features = "nCount_RNA", y.max = 20000, pt.size = 0)
+  pctmt <- VlnPlot(all_list[[i]], features = "percent.mt", pt.size = 0) # VlnPlot(all, features = "percent.mt", y.max = 25, pt.size = 0)
+plot1 <- FeatureScatter(all_list[[i]], feature1 = "nCount_RNA", feature2 = "percent.mt", pt.size = 0.0001) 
+plot2 <- FeatureScatter(all_list[[i]], feature1 = "nCount_RNA", feature2 = "nFeature_RNA", pt.size = 0.0001) 
+  print(nfeat)
+  print(ncount)
+  print(pctmt)
+  print(plot1)
+  print(plot2)
+}
+
+```
+
+```{r, echo = TRUE, eval = FALSE}
+# all datasets
+
+for (i in 1:length(all_list)){
+  all_list[[i]] <- subset(all_list[[i]], subset = percent.mt < 6 & nCount_RNA > 1000 & nCount_RNA < 20000 & nFeature_RNA > 600) 
+}
+
+
+# only sctransform 
+
+ all_list <- lapply(X = all_list, FUN = SCTransform) 
+ features <- SelectIntegrationFeatures(object.list = all_list, nfeatures = 3000)
+ all_list <- PrepSCTIntegration(object.list = all_list, anchor.features = features)
+  
+  all.anchors <- FindIntegrationAnchors(object.list = all_list, anchor.features = features, normalization.method = "SCT", verbose = TRUE) # can omit dims = 1:30 but   takes a really long time to run; determine if want to keep anchor.features = 2000; omit ndims for 9120 data
+  allnorm.integrated <- IntegrateData(anchorset = all.anchors, normalization.method = "SCT", verbose = TRUE)
+  
+# only std norm
+
+for (i in 1:length(all_list)){
+  all_list[[i]] <- NormalizeData(all_list[[i]])
+  all_list[[i]] <- FindVariableFeatures(all_list[[i]], selection.method = "vst")}
+  
+ all.anchors <- FindIntegrationAnchors(object.list = all_list, anchor.features = 3000, verbose = TRUE) # can omit dims = 1:30 but   takes a really long time to run; determine if want to keep anchor.features = 2000; omit ndims for 9120 data
+  allnorm.integrated <- IntegrateData(anchorset = all.anchors, verbose = TRUE)
+
+# all integrated datasets
+  all <- allnorm.integrated # omit if using straight merge
+
+# save out each time - renamed appropriately
+saveRDS(all, "/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_SctCCA_omitdims.rds")
+# change depending on dataset and type of normalization
+```
+
+
+## Notes: omit scaleData for sctransform, switch to appropriate assay (SCT for sctransform, RNA for standard norm)
+
+
+```{r, eval = TRUE, echo = FALSE}
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500_pctmtRegress__081321_SctCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500_nopctmtRegress__081321_SctCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500_pctmtRegress_nomaxnFeat_081321_SctCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500_pctmtRegress_mito6_081321_StdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500_pctmtRegress_mito6_nosubsetCountFeat_081321_StdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500_pctmtRegress_mito6_nosubsetCountFeat_081621_SctCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500_pctmtRegress_mito6_nCountmax25000_nosubsetFeat_081621_StdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500_pctmtRegress_mito6_nCount750-25000_nosubsetFeat_081621_StdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500_pctmtRegress_mito6_nCount750-20000_nosubsetFeat_081621_StdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500_pctmtRegress_mito6_nCount750-20000_nosubsetFeat_081621_SctCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_StdCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_SctCCA.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_StdCCA_omitdims.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_SctCCA_omitdims.rds")
+all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_StdCCA_omitdims.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_SctCCA_omitdims.rds")
+```
+
+
+```{r, echo = TRUE}
+## set number of PCS/dims 
+PC = 30
+DM = 1:30
+DMset = 30
+```
+
+```{r, echo = TRUE}
+all <- ScaleData(all) #omit for sctransform
+all <- RunPCA(all, verbose = FALSE)
+ElbowPlot(all, ndims = 50) # omit ndims = DMset
+# vs all <- RunPCA(all, npcs = PC, verbose = FALSE)
+all <- RunUMAP(all, dims = DM, verbose = FALSE)
+# vs all <- RunUMAP(all, reduction = "pca", dims = DM)
+
+all <- FindNeighbors(all, dims = DM, verbose = FALSE)
+all <- FindClusters(all, verbose = FALSE)
+# vs all <- FindNeighbors(all, dims = DM) 
+# vs all <- FindClusters(all, resolution = 1)
+
+DimPlot(all, reduction = "umap", label = TRUE) 
+DimPlot(all, reduction = "umap", group.by = "orig.ident")
+
+all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = DM)
+PlotClusterTree(all.tree, label = TRUE)
+
+DimPlot(all.tree, reduction = "umap", label = TRUE) 
+DimPlot(all.tree, reduction = "umap", group.by = "orig.ident") 
+FeaturePlot(all.tree, features="nCount_RNA", label = TRUE) # source: https://www.biostars.org/p/469452/
+FeaturePlot(all.tree, features="nFeature_RNA", label = TRUE)
+FeaturePlot(all.tree, features="percent.mt", label = TRUE) 
+
+VlnPlot(all.tree, features = "nCount_RNA", pt.size = 0, ncol = 1) + NoLegend()
+VlnPlot(all.tree, features = "nCount_RNA", pt.size = 0, ncol = 1) + NoLegend() + scale_y_continuous(limits = c(0,5000))
+VlnPlot(all.tree, features = "nFeature_RNA", pt.size = 0, ncol = 1) + NoLegend()
+VlnPlot(all.tree, features = "nFeature_RNA", pt.size = 0, ncol = 1) + NoLegend() + scale_y_continuous(limits = c(0,2000))
+VlnPlot(all.tree, features = "percent.mt", pt.size = 0, ncol = 1) + NoLegend()
+```
+
+
+```{r, echo = FALSE}
+replaceLabelsX <- function(p,genelabels,namelist){
+  pp<- ggplot_build(p)
+  oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x$breaks
+  newxlabels = oldxlabels
+  for (i in 1:length(oldxlabels)){
+    loc<-which(genelabels==(oldxlabels[[i]]))
+    newxlabels[[i]] = paste(oldxlabels[[i]], "-", namelist[[loc[1]]])
+  }
+ p<- p + scale_x_discrete(labels = newxlabels)
+}
+```
+
+```{r, echo = FALSE, eval = TRUE}
+## hifiasm 5 cells
+
+yfg <- read.csv("~josongco/Desktop/hifiasm_5cells_primary_geneMatches - Sheet1.csv",stringsAsFactors=FALSE) # change gene list depending on genes of interest
+
+#yfg <- read.csv("~/Google Drive/miller niell octo seq/project data/hifiasm_5cells_primary_geneMatches.gsheet") # still in progress
+
+all.genes <- rownames(all.tree@assays$RNA) 
+#DefaultAssay(all.tree) <- "SCT"
+DefaultAssay(all.tree) <- "RNA" # standard norm
+
+genelist <- vector()
+namelist <- vector()
+genelabels <- vector()
+nomatch <- list()
+for (i in 1:nrow(yfg)){
+  gene <- yfg[[i,2]]
+  #print(gene)
+  # gene<-gsub("\\..*","",gene) not needed for Gabby's updated hifiasm 
+  #loc <- grep(gene,all.genes, fixed = TRUE)
+   loc <- which(all.genes ==gene)
+  if (length(loc)>0 & str_length(gene)>0) {
+    genelist <- c(genelist,loc)
+    namelist <- c(namelist, yfg[[i,1]])
+    genelabels<-c(genelabels, all.genes[[loc]])
+  } else {
+    nomatch <- c(nomatch,yfg[[i,2]])
+  }
+  #print(genelist)
+}
+
+p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()
+p<-replaceLabelsX(p,genelabels,namelist)
+p
+
+# fp <- FeaturePlot(all.tree, features = all.genes[genelist[1]], ncol = 1) + NoLegend() + NoAxes() 
+# scale_color_gradientn( colours = c('lightgrey', 'blue'),  limits = c(1, 8))
+
+for (i in 1:length(genelist)){
+  fp <- FeaturePlot(all.tree, features = all.genes[genelist[i]], ncol = 1) + NoAxes()
+  fp <- fp+ ggtitle(namelist[i])
+  print(fp)
+}
+```
+  
+```{r, echo = FALSE, eval = FALSE}
+# plot gene IDs 
+#markers <- read.csv("/Users/josongco/Desktop/markers_hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_StdCCA_omitdims.csv")
+markers <- read.csv("/Users/josongco/Desktop/markers_hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_SctCCA_omitdims.csv")
+#markers <- FindAllMarkers(all.tree,logfc.threshold = 0.5, min.pct = 0.5) # find genes with specific expression pattern (get rid of genes with expression everywhere or nowhere)
+yfg <- read.csv("/Users/josongco/Desktop/GeneIDs-Neuro_updated.csv",stringsAsFactors=FALSE) # Neuro genes with updated 
+#yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - More Neuro.csv",stringsAsFactors=FALSE) # Neuro genes with updated GeneIDs - More Neuro
+#yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - NPs.csv",stringsAsFactors=FALSE) # Neuro genes with updated GeneIDs - NPs
+
+
+genelist <- vector()
+namelist <- vector()
+genelabels <- vector()
+nomatch <- list()
+for (i in 1:nrow(yfg)){
+  gene <- yfg[[i,3]]
+  #print(gene)
+  # gene<-gsub("\\..*","",gene) not needed for Gabby's updated hifiasm 
+  #loc <- grep(gene,all.genes, fixed = TRUE)
+   loc <- which(all.genes ==gene)
+  if (length(loc)>0 & str_length(gene)>0) {
+    genelist <- c(genelist,loc)
+    namelist <- c(namelist, yfg[[i,1]])
+    genelabels<-c(genelabels, all.genes[[loc]])
+  } else {
+    nomatch <- c(nomatch,yfg[[i,3]])
+  }
+  #print(genelist)
+}
+
+
+use<- intersect(all.genes[genelist],unique(markers$gene)) # overlap between genelist and markers
+p<-DotPlot(all.tree,features=rev(use)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+# p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+p<-replaceLabelsX(p,genelabels,namelist)
+p
+
+#write.csv(markers, "/Users/josongco/Desktop/markers_hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_StdCCA_omitdims.csv")
+#write.csv(markers, "/Users/josongco/Desktop/markers_hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_SctCCA_omitdims.csv")
+```
+  
+```{r, echo = FALSE, eval = FALSE}
+# plot gene IDs 
+#markers <- FindAllMarkers(all.tree,logfc.threshold = 0.5, min.pct = 0.5) # find genes with specific expression pattern (get rid of genes with expression everywhere or nowhere)
+#yfg <- read.csv("/Users/josongco/Desktop/GeneIDs-Neuro_updated.csv",stringsAsFactors=FALSE) # Neuro genes with updated 
+yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - More Neuro.csv",stringsAsFactors=FALSE) # Neuro genes with updated GeneIDs - More Neuro
+#yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - NPs.csv",stringsAsFactors=FALSE) # Neuro genes with updated GeneIDs - NPs
+
+
+genelist <- vector()
+namelist <- vector()
+genelabels <- vector()
+nomatch <- list()
+for (i in 1:nrow(yfg)){
+  gene <- yfg[[i,3]]
+  #print(gene)
+  # gene<-gsub("\\..*","",gene) not needed for Gabby's updated hifiasm 
+  #loc <- grep(gene,all.genes, fixed = TRUE)
+   loc <- which(all.genes ==gene)
+  if (length(loc)>0 & str_length(gene)>0) {
+    genelist <- c(genelist,loc)
+    namelist <- c(namelist, yfg[[i,1]])
+    genelabels<-c(genelabels, all.genes[[loc]])
+  } else {
+    nomatch <- c(nomatch,yfg[[i,3]])
+  }
+  #print(genelist)
+}
+
+
+use<- intersect(all.genes[genelist],unique(markers$gene)) # overlap between genelist and markers
+p<-DotPlot(all.tree,features=rev(use)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+# p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+p<-replaceLabelsX(p,genelabels,namelist)
+p
+
+#write.csv(markers, "/Users/josongco/Desktop/markers_hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_StdCCA_omitdims.csv")
+```
+
+```{r, echo = FALSE, eval = FALSE}
+# plot gene IDs 
+#markers <- FindAllMarkers(all.tree,logfc.threshold = 0.5, min.pct = 0.5) # find genes with specific expression pattern (get rid of genes with expression everywhere or nowhere)
+#yfg <- read.csv("/Users/josongco/Desktop/GeneIDs-Neuro_updated.csv",stringsAsFactors=FALSE) # Neuro genes with updated 
+#yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - More Neuro.csv",stringsAsFactors=FALSE) # Neuro genes with updated GeneIDs - More Neuro
+yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - NPs.csv",stringsAsFactors=FALSE) # Neuro genes with updated GeneIDs - NPs
+
+
+genelist <- vector()
+namelist <- vector()
+genelabels <- vector()
+nomatch <- list()
+for (i in 1:nrow(yfg)){
+  gene <- yfg[[i,3]]
+  #print(gene)
+  # gene<-gsub("\\..*","",gene) not needed for Gabby's updated hifiasm 
+  #loc <- grep(gene,all.genes, fixed = TRUE)
+   loc <- which(all.genes ==gene)
+  if (length(loc)>0 & str_length(gene)>0) {
+    genelist <- c(genelist,loc)
+    namelist <- c(namelist, yfg[[i,1]])
+    genelabels<-c(genelabels, all.genes[[loc]])
+  } else {
+    nomatch <- c(nomatch,yfg[[i,3]])
+  }
+  #print(genelist)
+}
+
+
+use<- intersect(all.genes[genelist],unique(markers$gene)) # overlap between genelist and markers
+p<-DotPlot(all.tree,features=rev(use)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+# p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+p<-replaceLabelsX(p,genelabels,namelist)
+p
+
+#write.csv(markers, "/Users/josongco/Desktop/markers_hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_StdCCA_omitdims.csv")
+```
+  
+```{r eval = FALSE, echo = FALSE}
+## cluster markers
+markers_list = list()
+for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){
+  markersROC <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
+  markersROC <- setNames(cbind(rownames(markersROC), markersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
+  markersROC$diff_exp <- (markersROC$pct.1/markersROC$pct.2)
+  markersROC <- markersROC[order(-markersROC$diff_exp),]
+  header <- paste("Cluster", all.tree$seurat_clusters[m], sep = " ")
+  top5markers <- paste((head(markersROC$geneID, n = 5)))
+  marker_output <- c(header, top5markers)
+  print(marker_output)
+  markers_list[m] = markersROC
+  #features_df <- data.frame(Col1 = rep(all.tree$seurat_clusters[m], 5), Col2 = top5markers[m]) 
+   #     print(head(features_df))
+    #    features_df.merged <- features_df[m] %>%
+     #       dplyr::group_by(Col1) %>%
+      #      dplyr::summarize(Col2 = paste(features_df$Col2, collapse = ","))
+  #print(head(features_df.merged))
+  #print(DotPlot(all.tree, features = features_df.merged$Col2)+ RotatedAxis()) # can ID which cluster to view genes
+}
+
+saveRDS(markers_list, "/Users/josongco/Desktop/clustermarkers_std081821.rds")
+
+
+markersROC$GeneName <- '' # create empty column 
+inds <- which(markersROC[[1]] %in% yfg[[3]]) # find indices for TRUE geneIDs in selected csv/Genelist
+markersROC$GeneName[inds] <- yfg[which(yfg[[3]] %in% markersROC[[1]]),1] # include geneNames in markers file 
+```

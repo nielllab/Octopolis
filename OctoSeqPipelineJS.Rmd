@@ -26,12 +26,13 @@ In terminal command, enter: brew install sshfs
 
 # Mount to talapas
 In terminal command, enter: sshfs gcoffing@talapas-ln1.uoregon.edu:/projects/niell/shared/Octopus /Users/gcoffing/Octopus 
+[In terminal command, enter: sshfs jsongco@talapas-ln1.uoregon.edu:/projects/niell/shared/Octopus /Users/gcoffing/Octopus]
 Prior to mounting, user will need to create a directory to mount to; in my case, I created the directory "Octopus"
 
 ## Set working directory (run this line of code from the console rather than in a chunk)
 ```{r}
 setwd("/Users/gcoffing/Documents/Documents/octo/Seurat")
-setwd("/Users/josongco/Desktop/FinalSeqData")
+setwd("/Users/josongco/Desktop/ABD/FinalSeqData")
 ```
 
 ## Load libraries for Seurat
@@ -48,7 +49,7 @@ library(stringr)
 # change depending on user
 user = "mea"
 if (user == "mea"){
-  directoryMaster = "~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/directoryMaster_070720.csv"
+  directoryMaster = "~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/directoryMaster_072821.csv"
   full_namekey = "~/Google Drive/miller niell octo seq/project data/scRNAseq/Seurat/gene lists/geneIDs_miniNCBI_fulldf_namekey_Sep18_2.csv"
 } else if (user == "gabby"){
   directoryMaster = "directoryMaster_070720.csv"
@@ -109,9 +110,9 @@ print(namekeyDict[["OCTOGene.10032"]]) #should print "anaphase-promoting-complex
 all_list = list() 
 
 ct = 1 #what is ct?
-for(f in 1:2){ #Old or New gtf, NextSeq + HiSeq from directory master
-  all <- Read10X(data.dir = data_dir[f+16]) # f+16 for new gtf HiSeq, f+10 for old gtf HiSeq
-  ngenes <- length(all@Dimnames[[1]])
+for(f in 1:2){ #Old or New gtf, NextSeq + HiSeq from directory master, ipa 
+  all <- Read10X(data.dir = data_dir[f+22]) # f+16 for new gtf HiSeq, f+10 for old gtf HiSeq, f+18 for ipa gtf 1 & 2, f+22 for new hisat gtf + transdecoder
+    ngenes <- length(all@Dimnames[[1]])
     if (gtf == "original"){ #replacing Ocbim names
       for (g in 1:ngenes){
         gene <- all@Dimnames[[1]][g]
@@ -136,7 +137,7 @@ for(f in 1:2){ #Old or New gtf, NextSeq + HiSeq from directory master
          }
        }
       }
-  all <- CreateSeuratObject(counts = all, project = paste("Run", f, sep = ""), min.cells = 3, min.features = 750)
+  all <- CreateSeuratObject(counts = all, project = paste("Sample", f, sep = ""), min.cells = 3, min.features = 750)
   all_list[[ct]] = all
   ct = ct + 1
 }
@@ -147,9 +148,39 @@ grep("VGlut",all_list[[1]]@assays[["RNA"]]@data@Dimnames[[1]], ignore.case = TRU
 # double check that this is the right gene that you were looking for
 all_list[[1]]@assays[["RNA"]]@data@Dimnames[[1]][5437] # prints "VGlut-Major-Facilitator-Superfamily-solute-carrier-family-17-sodium-dependent-inorganic-phosphate-cotransporter-member-6-OG8038-OB24718"
 
-saveRDS(all_list, "/Users/josongco/Desktop/FinalSeqData/hisatAll_list_HE.rds") #change depending on dataset
+saveRDS(all_list, "/Users/josongco/Desktop/ABD/FinalSeqData/ipa_All_list_noname062121.rds") #change depending on dataset
   
 # To access individual objects: all_list[[1]]
 #example: all_list[[1]] will print the object information on Seurat object 1
+#
+#
+#
+
+ngenes <- length(all@Dimnames[[1]])
+    if (gtf == "original"){ #replacing Ocbim names
+      for (g in 1:ngenes){
+        gene <- all@Dimnames[[1]][g]
+        gene <- substr(gene, 6, str_length(gene)-2)
+        ind<- grep(gene, namekey[[3]])
+        if (length(ind)>0) {
+          id <- namekey[[ind[1], 2]]
+          if (str_length(id)>0){
+            id <- str_remove_all(id, "\\(") # parentheses mess up gene names as dimensions
+            id <- str_remove_all(id, "\\)") 
+            id <- substr(id, 1, 60) # keep it short
+            all@Dimnames[[1]][g] <- temp
+        }
+      }
+        } 
+      } else if (gtf == "hisat"){ #replacing Octogene names
+      for (g in 1:ngenes){
+        gene <- all@Dimnames[[1]][g]
+        temp <- namekeyDict[[gene]]
+        if (length(temp) == length(all@Dimnames[[1]][g])){ #This checks that temp is not zero
+         all@Dimnames[[1]][g] <- temp
+         }
+       }
+      }
+
 ```
 

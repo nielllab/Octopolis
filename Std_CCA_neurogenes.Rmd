@@ -401,12 +401,13 @@ findGenes <- function(yfg,allgenes) {
 
 #yfg <- read.csv("D:/data/octo seq/Genes for in situ.csv",stringsAsFactors=FALSE)
 
-neurogenes1 <- read.csv("/Users/josongco/Desktop/FinalSeqData/GeneIDs - Neuro.csv")
-
 # find match for yfg and all gene names
 
 neuro1genelist <- findGenes(neurogenes1[2:110,2], all.genes) # neuro genes 1
 neuro1genelist <- unique(neuro1genelist)
+
+neuro2genelist <- findGenes(neurogenes2[1:544,1], all.genes) # more neuro genes
+neuro2genelist <- unique(neuro2genelist)
 
 #genelist <- findGenes(yfg[1:12,2],all.genes)
 
@@ -420,39 +421,51 @@ neuro1genelist <- unique(neuro1genelist)
 
 DefaultAssay(all.tree) <- "RNA"
 
-# for loop for saving plots starts here: 
-getwd()
+genes = all.genes[neuro1genelist] #replace neuro2genelist with gene list that is to be used
+for (row in 1:length(genes)){
+  g = genes[row]
+  if (nchar(g) > 210){
+    g <- substring(g, 1, 210)
+  }
+  #replace file path with the path where plots are to be saved
+  featureplotName <- file.path("/Users","josongco","Desktop", "FinalSeqData", "in situ feature plots", "allneuro", paste(g,'featureplot.png', sep = '_'))
+  png(featureplotName)#, width = 900, height = 700)
+  fp <- FeaturePlot(all.tree, features = genes[row]) + NoLegend() + NoAxes() 
+  fp<- trimTitle(fp,30)
+  print(fp)
+  dev.off()
+}
 
-for (row in 1:nrow(neurogenes1)){
-  print(row)
- gene = rev(all.genes[neuro1genelist])
- 
-#dotplotName = paste(gene,'dotplot.png', sep = '_')
-dotplotName <- file.path("/Users","jsongco","Desktop", "FinalSeqData", "in situ feature plots", "allneuro", paste(gene[row],'dotplot.png', sep = '_'))
- png(dotplotName, width = 900, height = 700)
- dp <- DotPlot(all.tree, features = rev(all.genes[neuro1genelist])) + RotatedAxis()
- dp<- trimLabelsX(dp,20)
- print(dp)
- dev.off()
- 
- }
+for (row in 1:length(genes)){
+  g = genes[row]
+  if (nchar(g) > 210){
+    g <- substring(g, 1, 210)
+  }
+  #replace file path with the path where plots are to be saved
+  dotplotName <- file.path("/Users","josongco","Desktop", "FinalSeqData", "in situ feature plots", "allneuro", paste(g,'dotplot.png', sep = '_'))
+  png(dotplotName)#, width = 900, height = 700)
+  dp <- DotPlot(all.tree, features = genes[row]) + RotatedAxis()
+  dp<- trimLabelsX(dp,20)
+  print(dp)
+  dev.off()
+}
 
-for (row in 1:nrow(neurogenes1)){
-  print(row)
- gene = rev(all.genes[neuro1genelist])
- 
-#featureplotName = paste(gene,'featureplot.png', sep = '_')
-featureplotName <- file.path("/Users","jsongco","Desktop", "FinalSeqData", "in situ feature plots", "allneuro", paste(gene[row],'featureplot.png', sep = '_'))
- png(featureplotName, width = 900, height = 700)
- dp <- FeaturePlot(all.tree, features = rev(all.genes[neuro1genelist])) + NoLegend() + NoAxes() 
- fp<- trimTitle(fp,30)
- print(fp)
- dev.off()
- 
- }
+for (row in 1:length(genes)){
+  g = genes[row]
+  if (nchar(g) > 210){
+    g <- substring(g, 1, 210)
+  }
+  #replace file path with the path where plots are to be saved
+  vlnplotName <- file.path("/Users","josongco","Desktop", "FinalSeqData", "in situ feature plots", "allneuro", paste(g,'vlnplot.png', sep = '_'))
+  png(vlnplotName)#, width = 900, height = 700)
+  vp <- VlnPlot(all.tree, features = genes[row]) + RotatedAxis()
+  vp<- trimTitle(vp,20)
+  print(vp)
+  dev.off()
+}
 
 # dotplot of all genes from list
-p<-DotPlot(all.tree,features=rev(all.genes[neuro1genelist])) + RotatedAxis()
+p<-DotPlot(all.tree,features=rev(all.genes[neuro1genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 3)) + theme(axis.text.y = element_text(size = 0)) + NoLegend()
 p<- trimLabelsX(p,20)
 print(p)
 
@@ -505,10 +518,37 @@ for (i in 1:length(neuro1genelist)){
 #FeaturePlot(all.tree,features = all.genes[grep("03827",all.genes)]) 
 ```
 
+```{r}
+# plot all genes in a group, but only ones that are specifically expressed (i.e. markers)
+markers <- FindAllMarkers(all.tree,logfc.threshold = 0.5, min.pct = 0.5)
+
+DefaultAssay(all.tree) <- "RNA"
+
+yfg <- read.csv("/Users/josongco/Desktop/FinalSeqData/GeneIDS - More Neuro.csv",stringsAsFactors=FALSE)
+
+genelist <- findGenes(yfg[,1],all.genes) #use ,2 for Neuro and ,1 for More Neuro
+genelist <- unique(genelist)
+
+use<- intersect(all.genes[genelist],unique(markers$gene))
+
+# dotplot of all genes from list
+p<-DotPlot(all.tree,features=rev(use)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 3)) + NoLegend()
+p<- trimLabelsX(p,50)
+print(p)
+
+for (i in 1:length(use)){
+  p<- FeaturePlot(all.tree, features = use[i], ncol = 1) + NoLegend() + NoAxes() 
+  p<- trimTitle(p,100)
+  print(p)
+}
+
+
+```
+```
 
 ```{r echo = FALSE, eval = FALSE}
 # grep for genes
-genelist = grep("VGlut",all.genes, ignore.case = TRUE)
+genelist = grep("OG20425",all.genes, ignore.case = TRUE)
 
 # dotplot
 p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()
