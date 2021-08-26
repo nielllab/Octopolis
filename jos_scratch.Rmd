@@ -206,7 +206,7 @@ for (i in 1:length(genelist)){
 ```{r, echo = FALSE, eval = FALSE}
 # plot gene IDs 
 #markers <- read.csv("/Users/josongco/Desktop/markers_hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_StdCCA_omitdims.csv")
-markers <- read.csv("/Users/josongco/Desktop/markers_hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_SctCCA_omitdims.csv")
+#markers <- read.csv("/Users/josongco/Desktop/markers_hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_SctCCA_omitdims.csv")
 #markers <- FindAllMarkers(all.tree,logfc.threshold = 0.5, min.pct = 0.5) # find genes with specific expression pattern (get rid of genes with expression everywhere or nowhere)
 yfg <- read.csv("/Users/josongco/Desktop/GeneIDs-Neuro_updated.csv",stringsAsFactors=FALSE) # Neuro genes with updated 
 #yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - More Neuro.csv",stringsAsFactors=FALSE) # Neuro genes with updated GeneIDs - More Neuro
@@ -322,17 +322,27 @@ p
   
 ```{r eval = FALSE, echo = FALSE}
 ## cluster markers
-markers_list = list()
-for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){
-  markersROC <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
-  markersROC <- setNames(cbind(rownames(markersROC), markersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
-  markersROC$diff_exp <- (markersROC$pct.1/markersROC$pct.2)
-  markersROC <- markersROC[order(-markersROC$diff_exp),]
-  header <- paste("Cluster", all.tree$seurat_clusters[m], sep = " ")
-  top5markers <- paste((head(markersROC$geneID, n = 5)))
-  marker_output <- c(header, top5markers)
-  print(marker_output)
-  markers_list[m] = markersROC
+
+cluster.markers <- FindAllMarkers(all.tree, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25) # source: https://satijalab.org/seurat/articles/pbmc3k_tutorial.html
+cluster.markers$diff_exp <- (cluster.markers$pct.1/cluster.markers$pct.2)
+# cluster.markers %>% group_by(cluster) %>% top_n(2, wt = diff_exp) # not working currently - does not list only top 2
+
+write.csv(cluster.markers, "/Users/josongco/Desktop/Allclustermarkers_hifiasm5cells_std082621.csv")
+
+
+##markers_list = list()
+#for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){
+#  markersROC_test <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, only.pos = TRUE)
+#  markersROC_test$diff_exp <- (markersROC_test$pct.1/markersROC_test$pct.2)
+#  markersROC_test$cluster <- m
+  #markersROC_test <- markersROC_test[order(-markersROC_test$diff_exp),] # re-order to print top 5 differentially expressed genes
+  #markersROC_test <- setNames(cbind(rownames(markersROC_test), markersROC_test, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2", "diff_exp", "cluster") 
+  }
+  #header <- paste("Cluster", all.tree$seurat_clusters[m], sep = " ")
+  #top5markers <- paste((head(markersROC$geneID, n = 5)))
+  #marker_output <- c(header, top5markers)
+  #print(marker_output)
+#  markers_list[m] = markersROC
   #features_df <- data.frame(Col1 = rep(all.tree$seurat_clusters[m], 5), Col2 = top5markers[m]) 
    #     print(head(features_df))
     #    features_df.merged <- features_df[m] %>%
@@ -342,10 +352,17 @@ for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){
   #print(DotPlot(all.tree, features = features_df.merged$Col2)+ RotatedAxis()) # can ID which cluster to view genes
 }
 
-saveRDS(markers_list, "/Users/josongco/Desktop/clustermarkers_std081821.rds")
+#saveRDS(markers_list, "/Users/josongco/Desktop/clustermarkers_hifiasm5cells_std082621.rds")
 
 
-markersROC$GeneName <- '' # create empty column 
-inds <- which(markersROC[[1]] %in% yfg[[3]]) # find indices for TRUE geneIDs in selected csv/Genelist
-markersROC$GeneName[inds] <- yfg[which(yfg[[3]] %in% markersROC[[1]]),1] # include geneNames in markers file 
+yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
+
+#markersROC$GeneName <- '' # create empty column 
+#inds <- which(markersROC[[1]] %in% yfg[[3]]) # find indices for TRUE geneIDs in selected #csv/Genelist
+#markersROC$GeneName[inds] <- yfg[which(yfg[[3]] %in% markersROC[[1]]),1] # include #geneNames in markers file 
+
+                    
+cluster.markers$GeneName <- '' # create empty column 
+cl_inds <- which(cluster.markers[[7]] %in% yfg[[3]]) # find indices for TRUE geneIDs in selected csv/Genelist
+cluster.markers$GeneName[cl_inds] <- yfg[which(yfg[[3]] %in% cluster.markers[[7]]),1] # include geneNames in markers file , take first index
 ```
