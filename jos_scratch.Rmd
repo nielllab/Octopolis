@@ -325,7 +325,9 @@ p
 
 cluster.markers <- FindAllMarkers(all.tree, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25) # source: https://satijalab.org/seurat/articles/pbmc3k_tutorial.html
 cluster.markers$diff_exp <- (cluster.markers$pct.1/cluster.markers$pct.2)
-# cluster.markers %>% group_by(cluster) %>% top_n(2, wt = diff_exp) # not working currently - does not list only top 2
+cluster.markers %>%
+    group_by(cluster) %>%
+    top_n(n = 2, wt = cluster.markers$diff_exp)# not working currently - "Error: Result must have length 266, not 5457" 
 
 write.csv(cluster.markers, "/Users/josongco/Desktop/Allclustermarkers_hifiasm5cells_std082621.csv")
 
