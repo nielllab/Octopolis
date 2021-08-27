@@ -100,8 +100,8 @@ saveRDS(all, "/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_m
 #all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_SctCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_StdCCA_omitdims.rds")
 #all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_SctCCA_omitdims.rds")
-all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_StdCCA_omitdims.rds")
-#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_SctCCA_omitdims.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_StdCCA_omitdims.rds")
+all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_SctCCA_omitdims.rds")
 ```
 
 
@@ -113,7 +113,7 @@ DMset = 30
 ```
 
 ```{r, echo = TRUE}
-all <- ScaleData(all) #omit for sctransform
+#all <- ScaleData(all) #omit for sctransform
 all <- RunPCA(all, verbose = FALSE)
 ElbowPlot(all, ndims = 50) # omit ndims = DMset
 # vs all <- RunPCA(all, npcs = PC, verbose = FALSE)
@@ -166,8 +166,8 @@ yfg <- read.csv("~josongco/Desktop/hifiasm_5cells_primary_geneMatches - Sheet1.c
 #yfg <- read.csv("~/Google Drive/miller niell octo seq/project data/hifiasm_5cells_primary_geneMatches.gsheet") # still in progress
 
 all.genes <- rownames(all.tree@assays$RNA) 
-#DefaultAssay(all.tree) <- "SCT"
-DefaultAssay(all.tree) <- "RNA" # standard norm
+DefaultAssay(all.tree) <- "SCT"
+#DefaultAssay(all.tree) <- "RNA" # standard norm
 
 genelist <- vector()
 namelist <- vector()
@@ -327,10 +327,10 @@ cluster.markers <- FindAllMarkers(all.tree, only.pos = TRUE, min.pct = 0.25, log
 cluster.markers$diff_exp <- (cluster.markers$pct.1/cluster.markers$pct.2)
 cluster.markers %>%
     group_by(cluster) %>%
-    top_n(n = 2, wt = cluster.markers$diff_exp)# not working currently - "Error: Result must have length 266, not 5457" 
+    top_n(n = 10, wt = diff_exp) ->top10
 
-write.csv(cluster.markers, "/Users/josongco/Desktop/Allclustermarkers_hifiasm5cells_std082621.csv")
-
+#write.csv(cluster.markers, "/Users/josongco/Desktop/Allclustermarkers_hifiasm5cells_std082621.csv")
+write.csv(cluster.markers, "/Users/josongco/Desktop/Allclustermarkers_hifiasm5cells_sct082621.csv")
 
 ##markers_list = list()
 #for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){
@@ -356,7 +356,9 @@ write.csv(cluster.markers, "/Users/josongco/Desktop/Allclustermarkers_hifiasm5ce
 
 #saveRDS(markers_list, "/Users/josongco/Desktop/clustermarkers_hifiasm5cells_std082621.rds")
 
+```
 
+```{r}
 yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
 
 #markersROC$GeneName <- '' # create empty column 
@@ -364,7 +366,30 @@ yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", strin
 #markersROC$GeneName[inds] <- yfg[which(yfg[[3]] %in% markersROC[[1]]),1] # include #geneNames in markers file 
 
                     
-cluster.markers$GeneName <- '' # create empty column 
-cl_inds <- which(cluster.markers[[7]] %in% yfg[[3]]) # find indices for TRUE geneIDs in selected csv/Genelist
-cluster.markers$GeneName[cl_inds] <- yfg[which(yfg[[3]] %in% cluster.markers[[7]]),1] # include geneNames in markers file , take first index
+#cl_inds <- which(top10[[7]] %in% yfg[[3]]) # find indices for TRUE geneIDs in selected csv/Genelist
+#top10$GeneName[cl_inds] <- yfg[which(yfg[[3]] %in% top10[[7]]),1] # include geneNames in markers file , take first index
+```
+
+
+```{r}
+# function to add gene names to data table
+# assumes first column of table is G gene
+# uses master list with gene name in 1st column, G gene in 3rd column
+addGeneNamesTable<- function(data,gene_master){
+  data$GeneName <- '' # create empty column 
+  for (i in 1:nrow(data)){
+    ggene = data[[i,1]]
+    loc <- which(gene_master[[3]] ==ggene)
+    if (length(loc)>0) {  # if something is found
+      data$GeneName[[i]] <- gene_master[[loc[1],1]] # if multiple found, use 1st one
+    }
+  }
+  
+  data
+}
+```
+
+```{r}
+top10<-addGeneNamesTable(top10,yfg)
+top10
 ```
