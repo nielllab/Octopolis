@@ -146,6 +146,21 @@ replaceLabelsX <- function(p,genelabels,namelist){
 }
 ```
 
+
+```{r, echo = FALSE}
+replaceLabelsY <- function(p,genelabels,namelist){
+  pp<- ggplot_build(p)
+  oldylabels = ggplot_build(p)$layout$panel_params[[1]]$y$breaks
+  newylabels = oldylabels
+  for (i in 1:length(oldylabels)){
+    loc<-which(genelabels==(oldylabels[[i]]))
+    newylabels[[i]] = paste(oldylabels[[i]], "-", namelist[[loc[1]]])
+  }
+ p<- p + scale_y_discrete(labels = newylabels)
+}
+```
+
+
 ```{r, echo = TRUE} 
 ### WORKING ON THIS CHUNK - GOAL IS TO PLOT WITH GENE DESCRIPTIONS INSTEAD OF JUST ADDITIONAL COLUMN
 #all <- ScaleData(all) #omit for sctransform
@@ -165,11 +180,11 @@ yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", strin
 hm.multi<-addGeneNamesTable(hm.multi$data,yfg)
 hm.multi
 
-for (i in 1:length(vz)){
-  vz[[i]] <- VizDimLoadings(all, dims = 1:i)
-  vz[[i]]<-addGeneNamesTable(vz[[i]]$data,yfg)
-  vz[[i]] 
-  }
+p <- VizDimLoadings(all, dims = 1:2, combine = TRUE)
+p <- replaceLabelsY(p,genelabels,namelist)
+
+vz<-replaceLabelsX(p,genelabels,namelist)
+print(vz)
 
 ElbowPlot(all, ndims = 50) # omit ndims = DMset
 # vs all <- RunPCA(all, npcs = PC, verbose = FALSE)
