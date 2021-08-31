@@ -206,11 +206,10 @@ hm.multi
 #hm.multi <- hm.multi + scale_y_discrete(hm.multi$GeneName)
 
 p <- VizDimLoadings(all, dims = 1:2, combine = TRUE)
-p <- replaceLabelsY(p, oldylabels, newylabels)
+p<- p + scale_y_discrete(labels = newylabels) # this works?
+#p <- replaceLabelsY(p, oldylabels, newylabels)
 print(p)
 
-vz<-replaceLabelsX(p,genelabels,namelist)
-print(vz)
 ```
 
 ```{r}
