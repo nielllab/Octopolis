@@ -148,7 +148,7 @@ replaceLabelsX <- function(p,genelabels,namelist){
 
 
 ```{r, echo = FALSE}
-replaceLabelsY <- function(p,genelabels,namelist){
+replaceLabelsY <- function(p,oldylabels,newylabels){
   pp<- ggplot_build(p)
   oldylabels = ggplot_build(p)$layout$panel_params[[1]]$y$breaks
   newylabels = oldylabels
@@ -157,8 +157,8 @@ replaceLabelsY <- function(p,genelabels,namelist){
       if (length(loc)> 0) {
         #loc<-which(oldylabels %in% genelabels)
         newylabels[[i]] = paste(oldylabels[[i]], "-", namelist[[loc[1]]])
-         } else {
-      newylabels[[i]] = paste(oldylabels[[i]])
+         #} else {
+      #newylabels[[i]] = paste(oldylabels[[i]])
 }}
  p<- p + scale_y_discrete(labels = newylabels)
 }
@@ -191,24 +191,31 @@ for (i in 1:nrow(yfg)){
   #print(genelist)
 }
 
-#DimHeatmap(all, dims = 1:50, cells = 500, balanced = TRUE, fast = FALSE)
-hm.multi <- DimHeatmap(all, dims = 1:50, cells = 500, balanced = TRUE, fast = FALSE)
+for (i in 1:50){
+  p <- DimHeatmap(all, dims = i, cells = 500, balanced = TRUE, fast = FALSE)
+  #p<- p + scale_y_discrete(labels = newylabels) # this works?
+  p <- replaceLabelsY(p, oldylabels, newylabels)
+  print(p)
+}
+
 #print(hm.multi)
 
 #heatmapfeatures <- data_frame(hm.multi$data$Feature)
 
 #heatmapfeatures$GeneName <- '' # create empty column 
-#heatmap_inds <- which(heatmapfeatures[[1]] %in% yfg[[3]]) # find indices for TRUE geneIDs in #selected csv/Genelist
+#heatmap_inds <- which(p$data$Feature %in% yfg[[3]]) # find indices for TRUE geneIDs in #selected csv/Genelist
 #heatmapfeatures$GeneName[heatmap_inds] <- yfg[which(yfg[[3]] %in% heatmapfeatures[[1]]),1] # #include geneNames in markers file , take first index
 
-hm.multi<-addGeneNamesTable(hm.multi$data,yfg)
-hm.multi
+#hm.multi<-addGeneNamesTable(p$data,yfg)
+#hm.multi
 #hm.multi <- hm.multi + scale_y_discrete(hm.multi$GeneName)
 
-p <- VizDimLoadings(all, dims = 1:2, combine = TRUE)
-p<- p + scale_y_discrete(labels = newylabels) # this works?
-#p <- replaceLabelsY(p, oldylabels, newylabels)
-print(p)
+for (i in 1:50){
+  p <- VizDimLoadings(all, dims = i, combine = TRUE)
+  #p<- p + scale_y_discrete(labels = newylabels) # this works?
+  p <- replaceLabelsY(p, oldylabels, newylabels)
+  print(p)
+}
 
 ```
 
