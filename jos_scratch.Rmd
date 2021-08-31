@@ -112,9 +112,44 @@ DM = 1:30
 DMset = 30
 ```
 
+```{r echo = FALSE, eval = FALSE}
+# function to add gene names to data table
+# assumes first column of table is G gene
+# uses master list with gene name in 1st column, G gene in 3rd column
+addGeneNamesTable<- function(data,gene_master){
+  data$GeneName <- '' # create empty column 
+  for (i in 1:nrow(data)){
+    #ggene = data$gene[[i]] #cluster markers
+    ggene = data$Feature[[i]] #dimheatmap
+    loc <- which(gene_master[[3]] ==ggene)
+    if (length(loc)>0) {  # if something is found
+      data$GeneName[[i]] <- gene_master[[loc[1],1]] # if multiple found, use 1st one
+    }
+  }
+  
+  data
+}
+```
+
 ```{r, echo = TRUE}
 #all <- ScaleData(all) #omit for sctransform
 all <- RunPCA(all, verbose = FALSE)
+
+#DimHeatmap(all, dims = 1:50, cells = 500, balanced = TRUE, fast = FALSE)
+hm.multi <- DimHeatmap(all, dims = 1:50, cells = 500, balanced = TRUE, fast = FALSE)
+#print(hm.multi)
+
+#heatmapfeatures <- data_frame(hm.multi$data$Feature)
+
+#heatmapfeatures$GeneName <- '' # create empty column 
+#heatmap_inds <- which(heatmapfeatures[[1]] %in% yfg[[3]]) # find indices for TRUE geneIDs in #selected csv/Genelist
+#heatmapfeatures$GeneName[heatmap_inds] <- yfg[which(yfg[[3]] %in% heatmapfeatures[[1]]),1] # #include geneNames in markers file , take first index
+
+yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
+hm.multi<-addGeneNamesTable(hm.multi$data,yfg)
+hm.multi
+
+
 ElbowPlot(all, ndims = 50) # omit ndims = DMset
 # vs all <- RunPCA(all, npcs = PC, verbose = FALSE)
 all <- RunUMAP(all, dims = DM, verbose = FALSE)
@@ -205,89 +240,10 @@ for (i in 1:length(genelist)){
   
 ```{r, echo = FALSE, eval = FALSE}
 # plot gene IDs 
-#markers <- read.csv("/Users/josongco/Desktop/markers_hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_StdCCA_omitdims.csv")
-#markers <- read.csv("/Users/josongco/Desktop/markers_hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_SctCCA_omitdims.csv")
-#markers <- FindAllMarkers(all.tree,logfc.threshold = 0.5, min.pct = 0.5) # find genes with specific expression pattern (get rid of genes with expression everywhere or nowhere)
-yfg <- read.csv("/Users/josongco/Desktop/GeneIDs-Neuro_updated.csv",stringsAsFactors=FALSE) # Neuro genes with updated 
-#yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - More Neuro.csv",stringsAsFactors=FALSE) # Neuro genes with updated GeneIDs - More Neuro
-#yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - NPs.csv",stringsAsFactors=FALSE) # Neuro genes with updated GeneIDs - NPs
-
-
-genelist <- vector()
-namelist <- vector()
-genelabels <- vector()
-nomatch <- list()
-for (i in 1:nrow(yfg)){
-  gene <- yfg[[i,3]]
-  #print(gene)
-  # gene<-gsub("\\..*","",gene) not needed for Gabby's updated hifiasm 
-  #loc <- grep(gene,all.genes, fixed = TRUE)
-   loc <- which(all.genes ==gene)
-  if (length(loc)>0 & str_length(gene)>0) {
-    genelist <- c(genelist,loc)
-    namelist <- c(namelist, yfg[[i,1]])
-    genelabels<-c(genelabels, all.genes[[loc]])
-  } else {
-    nomatch <- c(nomatch,yfg[[i,3]])
-  }
-  #print(genelist)
-}
-
-
-use<- intersect(all.genes[genelist],unique(markers$gene)) # overlap between genelist and markers
-p<-DotPlot(all.tree,features=rev(use)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
-# p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
-p<-replaceLabelsX(p,genelabels,namelist)
-p
-
-#write.csv(markers, "/Users/josongco/Desktop/markers_hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_StdCCA_omitdims.csv")
-#write.csv(markers, "/Users/josongco/Desktop/markers_hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_SctCCA_omitdims.csv")
-```
-  
-```{r, echo = FALSE, eval = FALSE}
-# plot gene IDs 
 #markers <- FindAllMarkers(all.tree,logfc.threshold = 0.5, min.pct = 0.5) # find genes with specific expression pattern (get rid of genes with expression everywhere or nowhere)
 #yfg <- read.csv("/Users/josongco/Desktop/GeneIDs-Neuro_updated.csv",stringsAsFactors=FALSE) # Neuro genes with updated 
 yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - More Neuro.csv",stringsAsFactors=FALSE) # Neuro genes with updated GeneIDs - More Neuro
 #yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - NPs.csv",stringsAsFactors=FALSE) # Neuro genes with updated GeneIDs - NPs
-
-
-genelist <- vector()
-namelist <- vector()
-genelabels <- vector()
-nomatch <- list()
-for (i in 1:nrow(yfg)){
-  gene <- yfg[[i,3]]
-  #print(gene)
-  # gene<-gsub("\\..*","",gene) not needed for Gabby's updated hifiasm 
-  #loc <- grep(gene,all.genes, fixed = TRUE)
-   loc <- which(all.genes ==gene)
-  if (length(loc)>0 & str_length(gene)>0) {
-    genelist <- c(genelist,loc)
-    namelist <- c(namelist, yfg[[i,1]])
-    genelabels<-c(genelabels, all.genes[[loc]])
-  } else {
-    nomatch <- c(nomatch,yfg[[i,3]])
-  }
-  #print(genelist)
-}
-
-
-use<- intersect(all.genes[genelist],unique(markers$gene)) # overlap between genelist and markers
-p<-DotPlot(all.tree,features=rev(use)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
-# p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
-p<-replaceLabelsX(p,genelabels,namelist)
-p
-
-#write.csv(markers, "/Users/josongco/Desktop/markers_hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_StdCCA_omitdims.csv")
-```
-
-```{r, echo = FALSE, eval = FALSE}
-# plot gene IDs 
-#markers <- FindAllMarkers(all.tree,logfc.threshold = 0.5, min.pct = 0.5) # find genes with specific expression pattern (get rid of genes with expression everywhere or nowhere)
-#yfg <- read.csv("/Users/josongco/Desktop/GeneIDs-Neuro_updated.csv",stringsAsFactors=FALSE) # Neuro genes with updated 
-#yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - More Neuro.csv",stringsAsFactors=FALSE) # Neuro genes with updated GeneIDs - More Neuro
-yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - NPs.csv",stringsAsFactors=FALSE) # Neuro genes with updated GeneIDs - NPs
 
 
 genelist <- vector()
@@ -358,7 +314,7 @@ write.csv(cluster.markers, "/Users/josongco/Desktop/Allclustermarkers_hifiasm5ce
 
 ```
 
-```{r}
+```{r echo = FALSE, eval = FALSE}
 yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
 
 #markersROC$GeneName <- '' # create empty column 
@@ -368,17 +324,19 @@ yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", strin
                     
 #cl_inds <- which(top10[[7]] %in% yfg[[3]]) # find indices for TRUE geneIDs in selected csv/Genelist
 #top10$GeneName[cl_inds] <- yfg[which(yfg[[3]] %in% top10[[7]]),1] # include geneNames in markers file , take first index
+
+write.csv(top10, "/Users/josongco/Desktop/top10_std_082721.csv")
+
 ```
 
-
-```{r}
+```{r echo = FALSE, eval = FALSE}
 # function to add gene names to data table
 # assumes first column of table is G gene
 # uses master list with gene name in 1st column, G gene in 3rd column
 addGeneNamesTable<- function(data,gene_master){
   data$GeneName <- '' # create empty column 
   for (i in 1:nrow(data)){
-    ggene = data[[i,1]]
+    ggene = data$gene[[i]]
     loc <- which(gene_master[[3]] ==ggene)
     if (length(loc)>0) {  # if something is found
       data$GeneName[[i]] <- gene_master[[loc[1],1]] # if multiple found, use 1st one
@@ -389,7 +347,7 @@ addGeneNamesTable<- function(data,gene_master){
 }
 ```
 
-```{r}
+```{r echo = FALSE, eval = FALSE}
 top10<-addGeneNamesTable(top10,yfg)
 top10
 ```
