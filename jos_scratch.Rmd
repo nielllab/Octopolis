@@ -153,15 +153,16 @@ replaceLabelsY <- function(p,genelabels,namelist){
   oldylabels = ggplot_build(p)$layout$panel_params[[1]]$y$breaks
   newylabels = oldylabels
   for (i in 1:length(oldylabels)){
-      #if (length(loc)> 0) {
-        #loc<-which(genelabels==(oldylabels[[i]]))
-        loc<-which(oldylabels[[i]] %in% genelabels)
-        #newylabels[[i]] = paste(oldylabels[[i]], "-", namelist[[loc[1]]])
-      #   } else {
-      #newylabels[[i]] = paste(oldylabels[[i]])
-}
+      loc<-which(genelabels==(oldylabels[[i]])) # i/ind 4 = 919, G34789, neuroendocrine protein/ label = paste(genelabels[919], "-", namelist[919]) 
+      if (length(loc)> 0) {
+        #loc<-which(oldylabels %in% genelabels)
+        newylabels[[i]] = paste(oldylabels[[i]], "-", namelist[[loc[1]]])
+         } else {
+      newylabels[[i]] = paste(oldylabels[[i]])
+}}
  p<- p + scale_y_discrete(labels = newylabels)
 }
+
 ```
 
 
@@ -205,7 +206,7 @@ hm.multi
 #hm.multi <- hm.multi + scale_y_discrete(hm.multi$GeneName)
 
 p <- VizDimLoadings(all, dims = 1:2, combine = TRUE)
-p <- replaceLabelsY(p, genelabels, namelist)
+p <- replaceLabelsY(p, oldylabels, newylabels)
 print(p)
 
 vz<-replaceLabelsX(p,genelabels,namelist)
