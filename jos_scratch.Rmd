@@ -120,7 +120,8 @@ addGeneNamesTable<- function(data,gene_master){
   data$GeneName <- '' # create empty column 
   for (i in 1:nrow(data)){
     #ggene = data$gene[[i]] #cluster markers
-    ggene = data$Feature[[i]] #dimheatmap
+    #ggene = data$Feature[[i]] #dimheatmap
+    ggene = data$feature[[i]] #viz dim loadings
     loc <- which(gene_master[[3]] ==ggene)
     if (length(loc)>0) {  # if something is found
       data$GeneName[[i]] <- gene_master[[loc[1],1]] # if multiple found, use 1st one
@@ -131,7 +132,22 @@ addGeneNamesTable<- function(data,gene_master){
 }
 ```
 
-```{r, echo = TRUE}
+
+```{r, echo = FALSE}
+replaceLabelsX <- function(p,genelabels,namelist){
+  pp<- ggplot_build(p)
+  oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x$breaks
+  newxlabels = oldxlabels
+  for (i in 1:length(oldxlabels)){
+    loc<-which(genelabels==(oldxlabels[[i]]))
+    newxlabels[[i]] = paste(oldxlabels[[i]], "-", namelist[[loc[1]]])
+  }
+ p<- p + scale_x_discrete(labels = newxlabels)
+}
+```
+
+```{r, echo = TRUE} 
+### WORKING ON THIS CHUNK - GOAL IS TO PLOT WITH GENE DESCRIPTIONS INSTEAD OF JUST ADDITIONAL COLUMN
 #all <- ScaleData(all) #omit for sctransform
 all <- RunPCA(all, verbose = FALSE)
 
@@ -149,6 +165,11 @@ yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", strin
 hm.multi<-addGeneNamesTable(hm.multi$data,yfg)
 hm.multi
 
+for (i in 1:length(vz)){
+  vz[[i]] <- VizDimLoadings(all, dims = 1:i)
+  vz[[i]]<-addGeneNamesTable(vz[[i]]$data,yfg)
+  vz[[i]] 
+  }
 
 ElbowPlot(all, ndims = 50) # omit ndims = DMset
 # vs all <- RunPCA(all, npcs = PC, verbose = FALSE)
@@ -162,7 +183,33 @@ all <- FindClusters(all, verbose = FALSE)
 
 DimPlot(all, reduction = "umap", label = TRUE) 
 DimPlot(all, reduction = "umap", group.by = "orig.ident")
+```
 
+```{r}
+all.genes <- rownames(all@assays$RNA) 
+
+genelist <- vector()
+namelist <- vector()
+genelabels <- vector()
+nomatch <- list()
+for (i in 1:nrow(yfg)){
+  gene <- yfg[[i,3]]
+  #print(gene)
+  # gene<-gsub("\\..*","",gene) not needed for Gabby's updated hifiasm 
+  #loc <- grep(gene,all.genes, fixed = TRUE)
+   loc <- which(all.genes ==gene)
+  if (length(loc)>0 & str_length(gene)>0) {
+    genelist <- c(genelist,loc)
+    namelist <- c(namelist, yfg[[i,1]])
+    genelabels<-c(genelabels, all.genes[[loc]])
+  } else {
+    nomatch <- c(nomatch,yfg[[i,3]])
+  }
+  #print(genelist)
+}
+```
+
+```{r, echo = TRUE}
 all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = DM)
 PlotClusterTree(all.tree, label = TRUE)
 
@@ -177,20 +224,6 @@ VlnPlot(all.tree, features = "nCount_RNA", pt.size = 0, ncol = 1) + NoLegend() +
 VlnPlot(all.tree, features = "nFeature_RNA", pt.size = 0, ncol = 1) + NoLegend()
 VlnPlot(all.tree, features = "nFeature_RNA", pt.size = 0, ncol = 1) + NoLegend() + scale_y_continuous(limits = c(0,2000))
 VlnPlot(all.tree, features = "percent.mt", pt.size = 0, ncol = 1) + NoLegend()
-```
-
-
-```{r, echo = FALSE}
-replaceLabelsX <- function(p,genelabels,namelist){
-  pp<- ggplot_build(p)
-  oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x$breaks
-  newxlabels = oldxlabels
-  for (i in 1:length(oldxlabels)){
-    loc<-which(genelabels==(oldxlabels[[i]]))
-    newxlabels[[i]] = paste(oldxlabels[[i]], "-", namelist[[loc[1]]])
-  }
- p<- p + scale_x_discrete(labels = newxlabels)
-}
 ```
 
 ```{r, echo = FALSE, eval = TRUE}
