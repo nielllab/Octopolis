@@ -167,7 +167,6 @@ replaceLabelsY <- function(p,oldylabels,newylabels){
 
 
 ```{r, echo = TRUE} 
-### WORKING ON THIS CHUNK - GOAL IS TO PLOT WITH GENE DESCRIPTIONS INSTEAD OF JUST ADDITIONAL COLUMN
 #all <- ScaleData(all) #omit for sctransform
 all <- RunPCA(all, verbose = FALSE)
 
@@ -195,26 +194,18 @@ for (i in 1:50){
   p <- DimHeatmap(all, dims = i, cells = 500, balanced = TRUE, fast = FALSE)
   #p<- p + scale_y_discrete(labels = newylabels) # this works?
   p <- replaceLabelsY(p, oldylabels, newylabels)
+  features<-addGeneNamesTable(p$data,yfg)
   print(p)
+  print(features)
 }
-
-#print(hm.multi)
-
-#heatmapfeatures <- data_frame(hm.multi$data$Feature)
-
-#heatmapfeatures$GeneName <- '' # create empty column 
-#heatmap_inds <- which(p$data$Feature %in% yfg[[3]]) # find indices for TRUE geneIDs in #selected csv/Genelist
-#heatmapfeatures$GeneName[heatmap_inds] <- yfg[which(yfg[[3]] %in% heatmapfeatures[[1]]),1] # #include geneNames in markers file , take first index
-
-#hm.multi<-addGeneNamesTable(p$data,yfg)
-#hm.multi
-#hm.multi <- hm.multi + scale_y_discrete(hm.multi$GeneName)
 
 for (i in 1:50){
   p <- VizDimLoadings(all, dims = i, combine = TRUE)
   #p<- p + scale_y_discrete(labels = newylabels) # this works?
   p <- replaceLabelsY(p, oldylabels, newylabels)
+  features<-addGeneNamesTable(p$data,yfg)
   print(p)
+  print(features)
 }
 
 ```
