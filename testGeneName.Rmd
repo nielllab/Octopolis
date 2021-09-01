@@ -3,8 +3,18 @@ title: "Untitled"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r}
+
+
+library(Seurat)
+library(Matrix)
+library(ggplot2)
+library(sctransform)
+library(stringr)
+library(cowplot) # used for CCA
+library(patchwork) # used for CCA
+library(dplyr) # used for print markers
+library(plotly) # used for 3D mapping of UMAP
 ```
 
 ## R Markdown
@@ -14,14 +24,75 @@ This is an R Markdown document. Markdown is a simple formatting syntax for autho
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r}
-gene_master <- read.csv("/Users/crisniell/Desktop/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
+gene_master <- read.csv("/Users/crisniell/Desktop/gene lists/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
 
-cluster.markers <- read.csv("/Users/crisniell/Desktop/Allclustermarkers_hifiasm5cells_std082621.csv", stringsAsFactors = FALSE) #temp master
+#cluster.markers <- read.csv("/Users/crisniell/Desktop/Allclustermarkers_hifiasm5cells_std082621.csv", stringsAsFactors = FALSE) #temp master
+
+ggene_ocbim <- read.csv("/Users/crisniell/Desktop/gene lists/GeneIDs - ggene ocbim minimap.csv", stringsAsFactors = FALSE) #temp master
+
+genes_id <- read.csv("/Users/crisniell/Desktop/gene lists/GeneIDs - AllGenesIDed.csv", stringsAsFactors = FALSE) #temp master
 
 cluster.markers %>%
     group_by(cluster) %>%
     top_n(n = 10, wt = diff_exp) ->top10
 
+```
+
+
+```{r}
+# add ocbim-based gene assignments into table
+# by combining minimap ggenes->ocbim with genes_IDed ocbim->desc 
+ggenes = unique(ggene_ocbim$g_gene)
+length(ggenes)
+gg_table <- tibble(ggenes)
+gg_table$full_ocbim <- ''
+gg_table$full_ob_desc <- ''
+for (g in 1:length(ggenes)){
+  loc = which(ggene_ocbim$g_gene == ggenes[[g]])
+  full_ob <- ''
+  full_desc <- ''
+  for (i in 1:length(loc)){
+    ob <- ggene_ocbim$ocbim[loc[i]]
+    loc2 <- which(genes_id$ocbim ==ob)
+    full_ob <- paste (full_ob, '-',ob)
+    if (length(loc2)>0){  # only uses first one. could iterate over loc2
+      if (full_desc==''){
+        full_desc <- genes_id$gene_desc[loc2[1]]
+      }
+      else{
+        full_desc <- paste(full_desc,'-',genes_id$gene_desc[loc2[1]]) 
+      }
+    }
+  }
+  gg_table$full_ocbim[g] <- full_ob
+  gg_table$full_ob_desc[g] <- full_desc
+  
+}
+
+
+
+```
+
+```{r}
+# add the manual gene assignments into the table
+gg_table$manual_desc <-''
+for (i in 1:nrow(gene_master)){
+  loc = which(gg_table$ggenes == gene_master$g_gene[i])
+  if (length(loc) ==1){
+    gg_table$manual_desc[loc] <- gene_master$gene_desc[i]
+  }
+  else {
+    add_row(gg_table, ggenes = gene_master$g_gene[i],manual_desc = gene_master$gene_desc[i])
+  }
+}
+```
+
+```{r}
+# merge the ocbim-based descriptions and manual descriptions
+gg_table$merge_desc <- ''
+for (i in 1:nrow(gg_table)){
+  gg_table$merge_desc[i] <- paste(gg_table$full_ob_desc[i],'+',gg_table$manual_desc[i])
+}
 ```
 
 
@@ -32,7 +103,7 @@ cluster.markers %>%
 addGeneNamesTable<- function(data,gene_master){
   data$GeneName <- '' # create empty column 
   for (i in 1:nrow(data)){
-    ggene = data[[i,1]]
+    ggene = data$gene[[i]]
     loc <- which(gene_master[[3]] ==ggene)
     if (length(loc)>0) {  # if something is found
       data$GeneName[[i]] <- gene_master[[loc[1],1]] # if multiple found, use 1st one
@@ -44,7 +115,7 @@ addGeneNamesTable<- function(data,gene_master){
 ```
 
 ```{r}
-top10<-addGeneNamesTable(top10,gene_master)
+top10new<-addGeneNamesTable(top10,gene_master)
 top10
 ```
 
