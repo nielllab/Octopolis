@@ -112,7 +112,7 @@ DM = 1:30
 DMset = 30
 ```
 
-```{r echo = FALSE, eval = FALSE}
+```{r echo = FALSE, eval = TRUE}
 # function to add gene names to data table
 # assumes first column of table is G gene
 # uses master list with gene name in 1st column, G gene in 3rd column
@@ -133,7 +133,7 @@ addGeneNamesTable<- function(data,gene_master){
 ```
 
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, eval = TRUE}
 replaceLabelsX <- function(p,genelabels,namelist){
   pp<- ggplot_build(p)
   oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x$breaks
@@ -147,7 +147,7 @@ replaceLabelsX <- function(p,genelabels,namelist){
 ```
 
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, eval = TRUE}
 replaceLabelsY <- function(p,oldylabels,newylabels){
   pp<- ggplot_build(p)
   oldylabels = ggplot_build(p)$layout$panel_params[[1]]$y$breaks
@@ -166,7 +166,7 @@ replaceLabelsY <- function(p,oldylabels,newylabels){
 ```
 
 
-```{r, echo = TRUE} 
+```{r, echo = TRUE, eval = TRUE} 
 #all <- ScaleData(all) #omit for sctransform
 all <- RunPCA(all, verbose = FALSE)
 
@@ -210,7 +210,7 @@ for (i in 1:50){
 
 ```
 
-```{r}
+```{r, echo = TRUE}
 ElbowPlot(all, ndims = 50) # omit ndims = DMset
 # vs all <- RunPCA(all, npcs = PC, verbose = FALSE)
 all <- RunUMAP(all, dims = DM, verbose = FALSE)
