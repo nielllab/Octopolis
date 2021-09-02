@@ -116,16 +116,16 @@ DMset = 30
 # function to add gene names to data table
 # assumes first column of table is G gene
 # uses master list with gene name in 1st column, G gene in 3rd column
-addGeneNamesTable<- function(data,gene_master){
+addGeneNamesTable<- function(data,geneID, gene, desc){ # a little redundant to send in geneID but this solves the problem that different objects name it differently
   data$GeneName <- '' # create empty column 
   for (i in 1:nrow(data)){
     #ggene = data$gene[[i]] #cluster markers
-    ggene = data$geneID[[i]] # individual cluster markers
+    ggene = geneID[[i]] # individual cluster markers
     #ggene = data$Feature[[i]] #dimheatmap
     #ggene = data$feature[[i]] #viz dim loadings
-    loc <- which(gene_master[[3]] ==ggene)
+    loc <- which(gene ==ggene)
     if (length(loc)>0) {  # if something is found
-      data$GeneName[[i]] <- gene_master[[loc[1],1]] # if multiple found, use 1st one
+      data$GeneName[[i]] <- desc[loc[1]] # if multiple found, use 1st one
     }
   }
   
@@ -135,35 +135,37 @@ addGeneNamesTable<- function(data,gene_master){
 
 
 ```{r, echo = FALSE, eval = TRUE}
-replaceLabelsX <- function(p,genelabels,namelist){
+replaceLabelsX <- function(p,gene,desc){
   pp<- ggplot_build(p)
   oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x$breaks
   newxlabels = oldxlabels
   for (i in 1:length(oldxlabels)){
-    loc<-which(genelabels==(oldxlabels[[i]]))
-    newxlabels[[i]] = paste(oldxlabels[[i]], "-", namelist[[loc[1]]])
+    loc<-which(gene==(oldxlabels[[i]]))
+    if (length(loc)>0){
+      newxlabels[[i]] = paste(oldxlabels[[i]], "-", desc[[loc[1]]])
+      newxlabels[[i]] = substr(newxlabels[[i]],1,50)
+    }
   }
- p<- p + scale_x_discrete(labels = newxlabels)
+  p<- p + scale_x_discrete(labels = newxlabels)
 }
 ```
 
 
 ```{r, echo = FALSE, eval = TRUE}
-replaceLabelsY <- function(p,oldylabels,newylabels){
+replaceLabelsY <- function(p,gene,desc){
   pp<- ggplot_build(p)
   oldylabels = ggplot_build(p)$layout$panel_params[[1]]$y$breaks
   newylabels = oldylabels
   for (i in 1:length(oldylabels)){
-      loc<-which(genelabels==(oldylabels[[i]])) # i/ind 4 = 919, G34789, neuroendocrine protein/ label = paste(genelabels[919], "-", namelist[919]) 
-      if (length(loc)> 0) {
-        #loc<-which(oldylabels %in% genelabels)
-        newylabels[[i]] = paste(oldylabels[[i]], "-", namelist[[loc[1]]])
-         #} else {
-      #newylabels[[i]] = paste(oldylabels[[i]])
-}}
- p<- p + scale_y_discrete(labels = newylabels)
+    loc<-which(gene==(oldylabels[[i]])) # i/ind 4 = 919, G34789, neuroendocrine protein/ label = paste(genelabels[919], "-", namelist[919]) 
+    if (length(loc)> 0) {
+      #loc<-which(oldylabels %in% genelabels)
+      newylabels[[i]] = paste(oldylabels[[i]], "-", desc[[loc[1]]])
+      newylabels[[i]] = substr(newylabels[[i]],1,50)
+    }
+  }
+  p<- p + scale_y_discrete(labels = newylabels)
 }
-
 ```
 
 
@@ -171,48 +173,43 @@ replaceLabelsY <- function(p,oldylabels,newylabels){
 #all <- ScaleData(all) #omit for sctransform
 all <- RunPCA(all, verbose = FALSE)
 
-all.genes <- rownames(all@assays$RNA) 
-yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
+#all.genes <- rownames(all@assays$SCT) #sctransform
+#all.genes <- rownames(all@assays$RNA) #RNA 
+#gene_master<- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
+gene_master<- read.csv("/Users/josongco/Desktop/merged_ggenes.csv", stringsAsFactors = FALSE) #merged_ggenes
 
-genelist <- vector()
-namelist <- vector()
-genelabels <- vector()
-nomatch <- list()
-for (i in 1:nrow(yfg)){
-  gene <- yfg[[i,3]]
-  loc <- which(all.genes ==gene)
-  if (length(loc)>0 & str_length(gene)>0) {
-    genelist <- c(genelist,loc)
-    namelist <- c(namelist, yfg[[i,1]])
-    genelabels<-c(genelabels, all.genes[[loc]])
-  } else {
-    nomatch <- c(nomatch,yfg[[i,3]])
-  }
-  #print(genelist)
-}
-
-for (i in 1:50){
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hackathon/sct_heatmap.pdf",
+    width = 8, # The width of the plot in inches
+    height = 8)
+for (i in 1:3){
   p <- DimHeatmap(all, dims = i, cells = 500, balanced = TRUE, fast = FALSE)
-  #p<- p + scale_y_discrete(labels = newylabels) # this works?
-  p <- replaceLabelsY(p, oldylabels, newylabels)
-  features<-addGeneNamesTable(p$data,yfg)
+  p <- replaceLabelsY(p, gene_master$ggenes, gene_master$merge_desc)
+  features<-addGeneNamesTable(p$data,p$data$Feature, gene_master$ggenes, gene_master$merge_desc)
   print(p)
   print(features)
 }
+dev.off()
 
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hackathon/sct_vizdim.pdf",
+    width = 8, # The width of the plot in inches
+    height = 8)
 for (i in 1:50){
   p <- VizDimLoadings(all, dims = i, combine = TRUE)
-  #p<- p + scale_y_discrete(labels = newylabels) # this works?
-  p <- replaceLabelsY(p, oldylabels, newylabels)
-  features<-addGeneNamesTable(p$data,yfg)
+  p <- replaceLabelsY(p, gene_master$ggenes, gene_master$merge_desc)
+  features<-addGeneNamesTable(p$data,p$data$feature, gene_master$ggenes, gene_master$merge_desc)
   print(p)
   print(features)
 }
+dev.off()
 
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hackathon/sct_elbow.pdf",
+    width = 8, # The width of the plot in inches
+    height = 8)
+ElbowPlot(all, ndims = 50) # omit ndims = DMset
+dev.off()
 ```
 
 ```{r, echo = TRUE}
-ElbowPlot(all, ndims = 50) # omit ndims = DMset
 # vs all <- RunPCA(all, npcs = PC, verbose = FALSE)
 all <- RunUMAP(all, dims = DM, verbose = FALSE)
 # vs all <- RunUMAP(all, reduction = "pca", dims = DM)
@@ -222,11 +219,18 @@ all <- FindClusters(all, verbose = FALSE)
 # vs all <- FindNeighbors(all, dims = DM) 
 # vs all <- FindClusters(all, resolution = 1)
 
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hackathon/sct_umap.pdf",
+    width = 8, # The width of the plot in inches
+    height = 5)
 DimPlot(all, reduction = "umap", label = TRUE) 
 DimPlot(all, reduction = "umap", group.by = "orig.ident")
+dev.off()
 ```
 
 ```{r, echo = TRUE}
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hackathon/sct_hierarchicaltree_umap.pdf",
+    width = 8, # The width of the plot in inches
+    height = 5)
 all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = DM)
 PlotClusterTree(all.tree, label = TRUE)
 
@@ -241,6 +245,7 @@ VlnPlot(all.tree, features = "nCount_RNA", pt.size = 0, ncol = 1) + NoLegend() +
 VlnPlot(all.tree, features = "nFeature_RNA", pt.size = 0, ncol = 1) + NoLegend()
 VlnPlot(all.tree, features = "nFeature_RNA", pt.size = 0, ncol = 1) + NoLegend() + scale_y_continuous(limits = c(0,2000))
 VlnPlot(all.tree, features = "percent.mt", pt.size = 0, ncol = 1) + NoLegend()
+dev.off()
 ```
 
 ```{r, echo = FALSE, eval = TRUE}
@@ -274,6 +279,9 @@ for (i in 1:nrow(yfg)){
   #print(genelist)
 }
 
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hackathon/sct_insitugenes_dot.pdf",
+    width = 8, # The width of the plot in inches
+    height = 8)
 p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()
 p<-replaceLabelsX(p,genelabels,namelist)
 p
@@ -281,13 +289,67 @@ p
 # fp <- FeaturePlot(all.tree, features = all.genes[genelist[1]], ncol = 1) + NoLegend() + NoAxes() 
 # scale_color_gradientn( colours = c('lightgrey', 'blue'),  limits = c(1, 8))
 
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hackathon/sct_insitugenes_feat.pdf",
+    width = 8, # The width of the plot in inches
+    height = 5)
 for (i in 1:length(genelist)){
   fp <- FeaturePlot(all.tree, features = all.genes[genelist[i]], ncol = 1) + NoAxes()
   fp <- fp+ ggtitle(namelist[i])
   print(fp)
 }
+dev.off()
 ```
+
+```{r, echo = FALSE, eval = TRUE}
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hackathon/sct_top30dot.pdf",
+    width = 8, # The width of the plot in inches
+    height = 8)
+for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){
+  clustermarkers_i <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
+  clustermarkers_i$diff_exp <- (clustermarkers_i$pct.1/clustermarkers_i$pct.2)
+  clustermarkers_i <- setNames(cbind(rownames(clustermarkers_i), clustermarkers_i, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2", "diff_exp")) 
+  clustermarkers_i %>%
+    top_n(n = 30, wt = diff_exp) ->top30
+   top30<-addGeneNamesTable(top30,top30$geneID,gene_master$ggenes, gene_master$merge_desc)
+   
+   print(top30)
+  p<-DotPlot(all.tree,features=top30$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7))
+  p<-replaceLabelsX(p,gene_master$ggenes,gene_master$merge_desc)
+  print(p)  
+}
+
+dev.off()
+
+  #inds <- which(top30[[1]] %in% yfg[[3]]) # find indices for TRUE geneIDs in selected #csv/Genelist
+  #top30$GeneName[inds] <- yfg[which(yfg[[3]] %in% top30[[1]]),1] # include #geneNames in markers file 
   
+##markers_list = list()
+#for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){
+#  markersROC_test <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, only.pos = TRUE)
+#  markersROC_test$diff_exp <- (markersROC_test$pct.1/markersROC_test$pct.2)
+#  markersROC_test$cluster <- m
+  #markersROC_test <- markersROC_test[order(-markersROC_test$diff_exp),] # re-order to print top 5 differentially expressed genes
+  #markersROC_test <- setNames(cbind(rownames(markersROC_test), markersROC_test, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2", "diff_exp", "cluster") 
+ # }
+  #header <- paste("Cluster", all.tree$seurat_clusters[m], sep = " ")
+  #top5markers <- paste((head(markersROC$geneID, n = 5)))
+  #marker_output <- c(header, top5markers)
+  #print(marker_output)
+#  markers_list[m] = markersROC
+  #features_df <- data.frame(Col1 = rep(all.tree$seurat_clusters[m], 5), Col2 = top5markers[m]) 
+   #     print(head(features_df))
+    #    features_df.merged <- features_df[m] %>%
+     #       dplyr::group_by(Col1) %>%
+      #      dplyr::summarize(Col2 = paste(features_df$Col2, collapse = ","))
+  #print(head(features_df.merged))
+  #print(DotPlot(all.tree, features = features_df.merged$Col2)+ RotatedAxis()) # can ID which cluster to view genes
+#}
+
+#saveRDS(markers_list, "/Users/josongco/Desktop/clustermarkers_hifiasm5cells_std082621.rds")
+
+```
+
+
 ```{r, echo = FALSE, eval = FALSE}
 # plot gene IDs 
 #markers <- FindAllMarkers(all.tree,logfc.threshold = 0.5, min.pct = 0.5) # find genes with specific expression pattern (get rid of genes with expression everywhere or nowhere)
@@ -338,128 +400,10 @@ cluster.markers %>%
 #write.csv(cluster.markers, "/Users/josongco/Desktop/Allclustermarkers_hifiasm5cells_std082621.csv")
 write.csv(cluster.markers, "/Users/josongco/Desktop/Allclustermarkers_hifiasm5cells_sct082621.csv")
 
-yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
-
-genelist <- vector()
-namelist <- vector()
-genelabels <- vector()
-nomatch <- list()
-for (i in 1:nrow(yfg)){
-  gene <- yfg[[i,3]]
-  #print(gene)
-  # gene<-gsub("\\..*","",gene) not needed for Gabby's updated hifiasm 
-  #loc <- grep(gene,all.genes, fixed = TRUE)
-   loc <- which(all.genes ==gene)
-  if (length(loc)>0 & str_length(gene)>0) {
-    genelist <- c(genelist,loc)
-    namelist <- c(namelist, yfg[[i,1]])
-    genelabels<-c(genelabels, all.genes[[loc]])
-  } else {
-    nomatch <- c(nomatch,yfg[[i,3]])
-  }
-  #print(genelist)
-}
-
-i = 1
-
-for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){
-  clustermarkers_i <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
-  clustermarkers_i$diff_exp <- (clustermarkers_i$pct.1/clustermarkers_i$pct.2)
-  clustermarkers_i <- setNames(cbind(rownames(clustermarkers_i), clustermarkers_i, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2", "diff_exp")) 
-  clustermarkers_i %>%
-    top_n(n = 30, wt = diff_exp) ->top30
-   top30<-addGeneNamesTable(top30,yfg)
-   
-   print(top30)
-  p<-DotPlot(all.tree,features=top30$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6))
-  #p<-replaceLabelsX(p,genelabels,namelist)
-  print(p)  
-}
-
-  
-
-  inds <- which(top30[[1]] %in% yfg[[3]]) # find indices for TRUE geneIDs in selected #csv/Genelist
-  top30$GeneName[inds] <- yfg[which(yfg[[3]] %in% top30[[1]]),1] # include #geneNames in markers file 
-  
-##markers_list = list()
-#for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){
-#  markersROC_test <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, only.pos = TRUE)
-#  markersROC_test$diff_exp <- (markersROC_test$pct.1/markersROC_test$pct.2)
-#  markersROC_test$cluster <- m
-  #markersROC_test <- markersROC_test[order(-markersROC_test$diff_exp),] # re-order to print top 5 differentially expressed genes
-  #markersROC_test <- setNames(cbind(rownames(markersROC_test), markersROC_test, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2", "diff_exp", "cluster") 
-  }
-  #header <- paste("Cluster", all.tree$seurat_clusters[m], sep = " ")
-  #top5markers <- paste((head(markersROC$geneID, n = 5)))
-  #marker_output <- c(header, top5markers)
-  #print(marker_output)
-#  markers_list[m] = markersROC
-  #features_df <- data.frame(Col1 = rep(all.tree$seurat_clusters[m], 5), Col2 = top5markers[m]) 
-   #     print(head(features_df))
-    #    features_df.merged <- features_df[m] %>%
-     #       dplyr::group_by(Col1) %>%
-      #      dplyr::summarize(Col2 = paste(features_df$Col2, collapse = ","))
-  #print(head(features_df.merged))
-  #print(DotPlot(all.tree, features = features_df.merged$Col2)+ RotatedAxis()) # can ID which cluster to view genes
-}
-
-#saveRDS(markers_list, "/Users/josongco/Desktop/clustermarkers_hifiasm5cells_std082621.rds")
-
 ```
-
-```{r, echo = FALSE, eval = TRUE}
-replaceLabelsXx <- function(p,oldxxlabels,newxxlabels){
-  pp<- ggplot_build(p)
-  oldxxlabels = ggplot_build(p)$layout$panel_params[[1]]$x$breaks
-  newxxlabels = oldxxlabels
-  for (i in 1:length(oldxxlabels)){
-      loc<-which(genelabels==(oldxxlabels[[i]])) # i/ind 4 = 919, G34789, neuroendocrine protein/ label = paste(genelabels[919], "-", namelist[919]) 
-      if (length(loc)> 0) {
-        #loc<-which(oldxxlabels %in% genelabels)
-        newxxlabels[[i]] = paste(oldxxlabels[[i]], "-", namelist[[loc[1]]])
-         #} else {
-      #newxxlabels[[i]] = paste(oldxxlabels[[i]])
-}}
- p<- p + scale_x_discrete(labels = newxxlabels)
-}
-
-
-for (m in 6:6){
-  clustermarkers_i <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
-  clustermarkers_i$diff_exp <- (clustermarkers_i$pct.1/clustermarkers_i$pct.2)
-  clustermarkers_i <- setNames(cbind(rownames(clustermarkers_i), clustermarkers_i, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2", "diff_exp")) 
-  clustermarkers_i %>%
-    top_n(n = 30, wt = diff_exp) ->top30
-   top30<-addGeneNamesTable(top30,yfg)
-   
-   print(top30)
-  p<-DotPlot(all.tree,features=top30$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6))
-  p<-replaceLabelsXx(p,oldxxlabels,newxxlabels)
-  print(p)  
-}
-```
-
-
-```{r}
-for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){
-  clustermarkers_i <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
-  clustermarkers_i$diff_exp <- (clustermarkers_i$pct.1/clustermarkers_i$pct.2)
-  clustermarkers_i <- setNames(cbind(rownames(clustermarkers_i), clustermarkers_i, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2", "diff_exp")) 
-  clustermarkers_i %>%
-    top_n(n = 30, wt = diff_exp) ->top30
-   top30<-addGeneNamesTable(top30,yfg)
-   
-   print(top30)
-  p<-DotPlot(all.tree,features=top30$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6))
-  p<-replaceLabelsXx(p,oldxxlabels,newxxlabels)
-  print(p)  
-}
-
-```
-
 
 ```{r echo = FALSE, eval = FALSE}
-yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
+#yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
 
 #markersROC$GeneName <- '' # create empty column 
 #inds <- which(markersROC[[1]] %in% yfg[[3]]) # find indices for TRUE geneIDs in selected #csv/Genelist
@@ -469,7 +413,7 @@ yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", strin
 #cl_inds <- which(top10[[7]] %in% yfg[[3]]) # find indices for TRUE geneIDs in selected csv/Genelist
 #top10$GeneName[cl_inds] <- yfg[which(yfg[[3]] %in% top10[[7]]),1] # include geneNames in markers file , take first index
 
-write.csv(top10, "/Users/josongco/Desktop/top10_std_082721.csv")
+#write.csv(top10, "/Users/josongco/Desktop/top10_std_082721.csv")
 
 ```
 
@@ -494,4 +438,5 @@ addGeneNamesTable<- function(data,gene_master){
 ```{r echo = FALSE, eval = FALSE}
 top10<-addGeneNamesTable(top10,yfg)
 top10
+write.csv(top10, "/Users/josongco/Desktop/top10_std_082721.csv")
 ```
