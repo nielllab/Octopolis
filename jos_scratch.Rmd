@@ -100,8 +100,8 @@ saveRDS(all, "/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_m
 #all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_SctCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_StdCCA_omitdims.rds")
 #all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_SctCCA_omitdims.rds")
-#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_StdCCA_omitdims.rds")
-all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_SctCCA_omitdims.rds")
+all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_StdCCA_omitdims.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_SctCCA_omitdims.rds")
 ```
 
 
@@ -170,7 +170,7 @@ replaceLabelsY <- function(p,gene,desc){
 
 
 ```{r, echo = TRUE, eval = TRUE} 
-#all <- ScaleData(all) #omit for sctransform
+all <- ScaleData(all) #omit for sctransform
 all <- RunPCA(all, verbose = FALSE)
 
 #all.genes <- rownames(all@assays$SCT) #sctransform
@@ -178,7 +178,7 @@ all <- RunPCA(all, verbose = FALSE)
 #gene_master<- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
 gene_master<- read.csv("/Users/josongco/Desktop/merged_ggenes.csv", stringsAsFactors = FALSE) #merged_ggenes
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hackathon/sct_heatmap.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090321names/std_heatmap.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
 for (i in 1:3){
@@ -190,7 +190,7 @@ for (i in 1:3){
 }
 dev.off()
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hackathon/sct_vizdim.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090321names/std_vizdim.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
 for (i in 1:50){
@@ -202,7 +202,7 @@ for (i in 1:50){
 }
 dev.off()
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hackathon/sct_elbow.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090321names/std_elbow.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
 ElbowPlot(all, ndims = 50) # omit ndims = DMset
@@ -219,7 +219,7 @@ all <- FindClusters(all, verbose = FALSE)
 # vs all <- FindNeighbors(all, dims = DM) 
 # vs all <- FindClusters(all, resolution = 1)
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hackathon/sct_umap.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090321names/std_umap.pdf",
     width = 8, # The width of the plot in inches
     height = 5)
 DimPlot(all, reduction = "umap", label = TRUE) 
@@ -228,7 +228,7 @@ dev.off()
 ```
 
 ```{r, echo = TRUE}
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hackathon/sct_hierarchicaltree_umap.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090321names/std_hierarchicaltree_umap.pdf",
     width = 8, # The width of the plot in inches
     height = 5)
 all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = DM)
@@ -256,8 +256,8 @@ yfg <- read.csv("~josongco/Desktop/hifiasm_5cells_primary_geneMatches - Sheet1.c
 #yfg <- read.csv("~/Google Drive/miller niell octo seq/project data/hifiasm_5cells_primary_geneMatches.gsheet") # still in progress
 
 all.genes <- rownames(all.tree@assays$RNA) 
-DefaultAssay(all.tree) <- "SCT"
-#DefaultAssay(all.tree) <- "RNA" # standard norm
+#DefaultAssay(all.tree) <- "SCT"
+DefaultAssay(all.tree) <- "RNA" # standard norm
 
 genelist <- vector()
 namelist <- vector()
@@ -279,7 +279,7 @@ for (i in 1:nrow(yfg)){
   #print(genelist)
 }
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hackathon/sct_insitugenes_dot.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090321names/std_insitugenes_dot.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
 p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()
@@ -289,7 +289,7 @@ p
 # fp <- FeaturePlot(all.tree, features = all.genes[genelist[1]], ncol = 1) + NoLegend() + NoAxes() 
 # scale_color_gradientn( colours = c('lightgrey', 'blue'),  limits = c(1, 8))
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hackathon/sct_insitugenes_feat.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090321names/std_insitugenes_feat.pdf",
     width = 8, # The width of the plot in inches
     height = 5)
 for (i in 1:length(genelist)){
@@ -301,7 +301,7 @@ dev.off()
 ```
 
 ```{r, echo = FALSE, eval = TRUE}
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hackathon/sct_top30dot.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090321names/std_top30dot.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
 for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){
