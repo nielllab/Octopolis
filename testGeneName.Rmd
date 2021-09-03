@@ -28,7 +28,7 @@ gene_master <- read.csv("/Users/crisniell/Desktop/gene lists/GeneIDs - GGene Tem
 
 #cluster.markers <- read.csv("/Users/crisniell/Desktop/Allclustermarkers_hifiasm5cells_std082621.csv", stringsAsFactors = FALSE) #temp master
 
-ggene_ocbim <- read.csv("/Users/crisniell/Desktop/gene lists/GeneIDs - ggene ocbim minimap.csv", stringsAsFactors = FALSE) #temp master
+ggene_ocbim <- read.csv("/Users/crisniell/Desktop/gene lists/GeneIDs - matches.csv", stringsAsFactors = FALSE) #temp master
 
 genes_id <- read.csv("/Users/crisniell/Desktop/gene lists/GeneIDs - AllGenesIDed.csv", stringsAsFactors = FALSE) #temp master
 
@@ -82,7 +82,8 @@ for (i in 1:nrow(gene_master)){
     gg_table$manual_desc[loc] <- gene_master$gene_desc[i]
   }
   else {
-    add_row(gg_table, ggenes = gene_master$g_gene[i],manual_desc = gene_master$gene_desc[i])
+    print(gene_master$g_gene[i])
+    gg_table<-add_row(gg_table, ggenes = gene_master$g_gene[i],manual_desc = gene_master$gene_desc[i])
   }
 }
 ```
@@ -93,6 +94,10 @@ gg_table$merge_desc <- ''
 for (i in 1:nrow(gg_table)){
   gg_table$merge_desc[i] <- paste(gg_table$full_ob_desc[i],'+',gg_table$manual_desc[i])
 }
+```
+
+```{r}
+write.csv(gg_table, "/Users/crisniell/Desktop/gene lists/merged_ggenes.csv")
 ```
 
 
