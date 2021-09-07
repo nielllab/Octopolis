@@ -90,6 +90,7 @@ for (i in 1:nrow(gene_master)){
 
 ```{r}
 # merge the ocbim-based descriptions and manual descriptions
+# gg_table <- read.csv("/Users/josongco/Desktop/GeneIDs - gg_table.csv", stringsAsFactors = FALSE) # read in spreadsheet from google drive and overwrite manual description to exclude "na"
 gg_table$merge_desc <- ''
 for (i in 1:nrow(gg_table)){
   gg_table$merge_desc[i] <- paste(gg_table$full_ob_desc[i],'+',gg_table$manual_desc[i])
@@ -98,6 +99,7 @@ for (i in 1:nrow(gg_table)){
 
 ```{r}
 write.csv(gg_table, "/Users/crisniell/Desktop/gene lists/merged_ggenes.csv")
+#write.csv(gg_table, "/Users/josongco/Desktop/merged_ggenes.csv")
 ```
 
 

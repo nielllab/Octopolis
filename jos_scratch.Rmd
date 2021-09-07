@@ -100,8 +100,8 @@ saveRDS(all, "/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_m
 #all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_SctCCA.rds")
 #all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_StdCCA_omitdims.rds")
 #all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_SctCCA_omitdims.rds")
-all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_StdCCA_omitdims.rds")
-#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_SctCCA_omitdims.rds")
+#all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_StdCCA_omitdims.rds")
+all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_SctCCA_omitdims.rds")
 ```
 
 
@@ -170,18 +170,18 @@ replaceLabelsY <- function(p,gene,desc){
 
 
 ```{r, echo = TRUE, eval = TRUE} 
-all <- ScaleData(all) #omit for sctransform
+#all <- ScaleData(all) #omit for sctransform
 all <- RunPCA(all, verbose = FALSE)
 
 #all.genes <- rownames(all@assays$SCT) #sctransform
 #all.genes <- rownames(all@assays$RNA) #RNA 
 #gene_master<- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
-gene_master<- read.csv("/Users/josongco/Desktop/merged_ggenes.csv", stringsAsFactors = FALSE) #merged_ggenes
+gene_master<- read.csv("/Users/josongco/Desktop/merged_ggenes.csv", stringsAsFactors = FALSE) #updated 090321 in google drive #merged_ggenes
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090321names/std_heatmap.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090621names/sct_heatmap.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
-for (i in 1:3){
+for (i in 1:50){
   p <- DimHeatmap(all, dims = i, cells = 500, balanced = TRUE, fast = FALSE)
   p <- replaceLabelsY(p, gene_master$ggenes, gene_master$merge_desc)
   features<-addGeneNamesTable(p$data,p$data$Feature, gene_master$ggenes, gene_master$merge_desc)
@@ -190,7 +190,7 @@ for (i in 1:3){
 }
 dev.off()
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090321names/std_vizdim.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090621names/sct_vizdim.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
 for (i in 1:50){
@@ -199,10 +199,12 @@ for (i in 1:50){
   features<-addGeneNamesTable(p$data,p$data$feature, gene_master$ggenes, gene_master$merge_desc)
   print(p)
   print(features)
+  PCName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090621names/", "PC", i, ".csv", sep = "")
+  write.csv(features, PCName)
 }
 dev.off()
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090321names/std_elbow.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090621names/sct_elbow.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
 ElbowPlot(all, ndims = 50) # omit ndims = DMset
@@ -219,7 +221,7 @@ all <- FindClusters(all, verbose = FALSE)
 # vs all <- FindNeighbors(all, dims = DM) 
 # vs all <- FindClusters(all, resolution = 1)
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090321names/std_umap.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090621names/sct_umap.pdf",
     width = 8, # The width of the plot in inches
     height = 5)
 DimPlot(all, reduction = "umap", label = TRUE) 
@@ -228,7 +230,7 @@ dev.off()
 ```
 
 ```{r, echo = TRUE}
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090321names/std_hierarchicaltree_umap.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090621names/sct_hierarchicaltree_umap.pdf",
     width = 8, # The width of the plot in inches
     height = 5)
 all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = DM)
@@ -256,8 +258,8 @@ yfg <- read.csv("~josongco/Desktop/hifiasm_5cells_primary_geneMatches - Sheet1.c
 #yfg <- read.csv("~/Google Drive/miller niell octo seq/project data/hifiasm_5cells_primary_geneMatches.gsheet") # still in progress
 
 all.genes <- rownames(all.tree@assays$RNA) 
-#DefaultAssay(all.tree) <- "SCT"
-DefaultAssay(all.tree) <- "RNA" # standard norm
+DefaultAssay(all.tree) <- "SCT"
+#DefaultAssay(all.tree) <- "RNA" # standard norm
 
 genelist <- vector()
 namelist <- vector()
@@ -279,7 +281,7 @@ for (i in 1:nrow(yfg)){
   #print(genelist)
 }
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090321names/std_insitugenes_dot.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090621names/sct_insitugenes_dot.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
 p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()
@@ -289,7 +291,7 @@ p
 # fp <- FeaturePlot(all.tree, features = all.genes[genelist[1]], ncol = 1) + NoLegend() + NoAxes() 
 # scale_color_gradientn( colours = c('lightgrey', 'blue'),  limits = c(1, 8))
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090321names/std_insitugenes_feat.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090621names/sct_insitugenes_feat.pdf",
     width = 8, # The width of the plot in inches
     height = 5)
 for (i in 1:length(genelist)){
@@ -301,7 +303,7 @@ dev.off()
 ```
 
 ```{r, echo = FALSE, eval = TRUE}
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090321names/std_top30dot.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090621names/sct_top30clustersdot.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
 for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){
@@ -311,6 +313,8 @@ for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){
   clustermarkers_i %>%
     top_n(n = 30, wt = diff_exp) ->top30
    top30<-addGeneNamesTable(top30,top30$geneID,gene_master$ggenes, gene_master$merge_desc)
+     clusterName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090621names/", "cluster", m, "_top30", ".csv", sep = "")
+  write.csv(top30, clusterName)
    
    print(top30)
   p<-DotPlot(all.tree,features=top30$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7))
@@ -347,6 +351,37 @@ dev.off()
 
 #saveRDS(markers_list, "/Users/josongco/Desktop/clustermarkers_hifiasm5cells_std082621.rds")
 
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090621names/sct_nodesdot.pdf",
+    width = 8, # The width of the plot in inches
+    height = 8)
+nodes <- unique(all.tree@tools$BuildClusterTree$edge[,1])
+for (n in 1:length(nodes)){
+  nodemarkersROC <- FindMarkers(all.tree, ident.1 = "clustertree", ident.2 = nodes[n], logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
+  nodemarkersROC <- setNames(cbind(rownames(nodemarkersROC), nodemarkersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
+  nodemarkersROC$diff_exp <- (nodemarkersROC$pct.1/nodemarkersROC$pct.2)
+  nodemarkersROC %>%
+    top_n(n = 30, wt = diff_exp) ->top30
+  top30<-addGeneNamesTable(top30,top30$geneID,gene_master$ggenes, gene_master$merge_desc)
+  nodeName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090621names/", "node", n, "_top30", ".csv", sep = "")
+  write.csv(top30, nodeName)
+  nodemarkersROC %>%
+    top_n(n = -30, wt = diff_exp) ->bottom30
+  top30<-addGeneNamesTable(bottom30,top30$geneID,gene_master$ggenes, gene_master$merge_desc)
+  nodeName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_090621names/", "node", n, "_bottom30", ".csv", sep = "")
+  write.csv(bottom30, nodeName)
+  
+  print(top30)
+  p<-DotPlot(all.tree,features=top30$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7))
+  p<-replaceLabelsX(p,gene_master$ggenes,gene_master$merge_desc)
+  print(p)  
+  
+  print(bottom30)
+  p<-DotPlot(all.tree,features=bottom30$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7))
+  p<-replaceLabelsX(p,gene_master$ggenes,gene_master$merge_desc)
+  print(p)  
+}
+
+dev.off()
 ```
 
 
@@ -354,7 +389,7 @@ dev.off()
 # plot gene IDs 
 #markers <- FindAllMarkers(all.tree,logfc.threshold = 0.5, min.pct = 0.5) # find genes with specific expression pattern (get rid of genes with expression everywhere or nowhere)
 #yfg <- read.csv("/Users/josongco/Desktop/GeneIDs-Neuro_updated.csv",stringsAsFactors=FALSE) # Neuro genes with updated 
-yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - More Neuro.csv",stringsAsFactors=FALSE) # Neuro genes with updated GeneIDs - More Neuro
+C2H2s <- read.csv("/Users/josongco/Desktop/GeneIDs - C2H2s.csv",stringsAsFactors=FALSE) # Neuro genes with updated GeneIDs - More Neuro
 #yfg <- read.csv("/Users/josongco/Desktop/GeneIDs - NPs.csv",stringsAsFactors=FALSE) # Neuro genes with updated GeneIDs - NPs
 
 
@@ -362,18 +397,18 @@ genelist <- vector()
 namelist <- vector()
 genelabels <- vector()
 nomatch <- list()
-for (i in 1:nrow(yfg)){
-  gene <- yfg[[i,3]]
+for (i in 1:nrow(C2H2s)){
+  gene <- C2H2s[[i,4]]
   #print(gene)
-  # gene<-gsub("\\..*","",gene) not needed for Gabby's updated hifiasm 
-  #loc <- grep(gene,all.genes, fixed = TRUE)
-   loc <- which(all.genes ==gene)
+  gene<-paste("- ", gene, sep="")
+  loc <- grep(gene,gene_master$full_ocbim, fixed = TRUE)
+  # loc <- which(gene_master$full_ocbim ==gene)
   if (length(loc)>0 & str_length(gene)>0) {
     genelist <- c(genelist,loc)
-    namelist <- c(namelist, yfg[[i,1]])
-    genelabels<-c(genelabels, all.genes[[loc]])
+    namelist <- c(namelist, C2H2s[[i,5]])
+    genelabels<-c(genelabels, gene_master$full_ocbim[[loc[1]]])
   } else {
-    nomatch <- c(nomatch,yfg[[i,3]])
+    nomatch <- c(nomatch,C2H2s[[i,4]])
   }
   #print(genelist)
 }
