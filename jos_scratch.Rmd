@@ -143,14 +143,13 @@ replaceLabelsX <- function(p,gene,desc){
     loc<-which(gene==(oldxlabels[[i]]))
     if (length(loc)>0){
       newxlabels[[i]] = paste(oldxlabels[[i]], "-", desc[[loc[1]]])
-      newxlabels[[i]] = substr(newxlabels[[i]],1,50)}}
-    
-    for (j in 1:length(newxlabels)){
-      inds <- str_detect(newxlabels, "- na")
-      if (inds[j] == TRUE){
-        loc<-which(noID$ggene==(newxlabels[[j]]))
-        newxlabels[[j]] = paste(newxlabels[[j]], "-", noID$Manual_NCBI_BLAST_ID[[j[1]]])
-    }
+      newxlabels[[i]] = substr(newxlabels[[i]],1,50)}
+    # else 
+    #   inds<-which(noID$ggene==(oldxlabels[[i]]))
+    # if (length(inds)>0){
+    #   newxlabels[[i]] = paste(newxlabels[[i]], "-", noID$Manual_NCBI_BLAST_ID[[loc[1]]])
+    # }
+    # newxlabels[[i]] = substr(newxlabels[[i]],1,50)
   }
   p<- p + scale_x_discrete(labels = newxlabels)
 }
@@ -175,8 +174,11 @@ replaceLabelsY <- function(p,gene,desc){
 
 
 ```{r, echo = TRUE, eval = TRUE} 
+#DefaultAssay(all) <- 'SCT'
 #all <- ScaleData(all) #omit for sctransform
+#all <- FindVariableFeatures(all)
 all <- RunPCA(all, verbose = FALSE)
+#all <- RunPCA(all, verbose = FALSE, npcs = 50)
 
 #all.genes <- rownames(all@assays$SCT) #sctransform
 #all.genes <- rownames(all@assays$RNA) #RNA 
@@ -217,14 +219,14 @@ pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/s
 ElbowPlot(all, ndims = 50) # omit ndims = DMset
 dev.off()
 
-#all <- JackStraw(all, dims = 200) # dims max depends on how many pcs originally calculated
-#all <- ScoreJackStraw(all)
+all <- JackStraw(all, dims = 50) # dims max depends on how many pcs originally calculated
+all <- ScoreJackStraw(all, dims = 1:50)
 
-#pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_jackstraw200.pdf",
-#    width = 8, # The width of the plot in inches
-#    height = 8)
-#JackStrawPlot(all, dims = 1:200)
-#dev.off()
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_jackstraw50.pdf",
+    width = 8, # The width of the plot in inches
+    height = 8)
+JackStrawPlot(all, dims = 1:50)
+dev.off()
 ```
 
 ```{r, echo = TRUE}
@@ -307,7 +309,7 @@ p
 # fp <- FeaturePlot(all.tree, features = all.genes[genelist[1]], ncol = 1) + NoLegend() + NoAxes() 
 # scale_color_gradientn( colours = c('lightgrey', 'blue'),  limits = c(1, 8))
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_insitugenes_feat.pdf",
+pdf(file = "/Users/josongco/Desktop/sctassay_insitugenes_feat.pdf",
     width = 8, # The width of the plot in inches
     height = 5)
 for (i in 1:length(genelist)){
@@ -323,20 +325,20 @@ noID <- read.csv("/Users/josongco/Desktop/ABD/FinalSeqData/genelists_091221/Gene
 pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_top30clustersInclNoIDdot.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
-for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){ #(nlevels((all.tree$seurat_clusters)) - 1)
+for (m in 5:5){ #(nlevels((all.tree$seurat_clusters)) - 1)){ #(nlevels((all.tree$seurat_clusters)) - 1)
   clustermarkers_i <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
   clustermarkers_i$diff_exp <- (clustermarkers_i$pct.1/clustermarkers_i$pct.2)
   clustermarkers_i <- setNames(cbind(rownames(clustermarkers_i), clustermarkers_i, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2", "diff_exp")) 
   clustermarkers_i %>%
-    top_n(n = 30, wt = diff_exp) ->top30
-   top30<-addGeneNamesTable(top30,top30$geneID,gene_master$ggenes, gene_master$merge_desc)
-     clusterName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/", "cluster", m, "_top30", ".csv", sep = "")
-  write.csv(top30, clusterName)
+    top_n(n = 10, wt = diff_exp) ->top10
+   top10<-addGeneNamesTable(top10,top10$geneID,gene_master$ggenes, gene_master$merge_desc)
+     clusterName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/", "cluster", m, "_top10", ".csv", sep = "")
+  #write.csv(top10, clusterName)
    
-   print(top30)
-  p<-DotPlot(all.tree,features=top30$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + NoLegend()
+   print(top10)
+  p<-DotPlot(all.tree,features=top10$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + NoLegend()
   p<-replaceLabelsX(p,gene_master$ggenes,gene_master$merge_desc)
-  p <- p+ ggtitle(paste('top30 for cluster', m, sep = " ")) 
+  p <- p+ ggtitle(paste('top10 for cluster', m, sep = " ")) 
   print(p)  
 }
 
@@ -429,6 +431,11 @@ cluster.markers <- read.csv("/Users/josongco/Desktop/Allclustermarkers_hifiasm5c
 #yfg <- read.csv("/Users/josongco/Desktop/GeneIDs-NPcorr_updated.csv",stringsAsFactors=FALSE) # NPcorr genes with updated 
 yfg <- read.csv("/Users/josongco/Desktop/ABD/FinalSeqData/genelists_091221/GeneIDs - NPs.csv",stringsAsFactors=FALSE) 
 
+yfg <- read.csv("~josongco/Desktop/ABD/FinalSeqData/genelists_091221/GeneIDs - cluster markers.csv",stringsAsFactors=FALSE) #GeneIDs - cluster markers
+
+
+genelist <- yfg$ggene
+use<- intersect(genelist,unique(cluster.markers$gene)) # overlap between genelist and markers
 
 
 genelist <- vector()
@@ -436,7 +443,7 @@ namelist <- vector()
 genelabels <- vector()
 nomatch <- list()
 for (i in 1:nrow(yfg)){
-  gene <- yfg[[i,2]] # yfg[[i,yfg$ocbim]]
+  gene <- yfg$ocbim[[i]] # yfg$ocbim[[i]]
   #print(gene)
   gene<-paste("- ", gene, sep="")
   loc <- grep(gene,gene_master$full_ocbim, fixed = TRUE)
@@ -448,7 +455,7 @@ for (i in 1:nrow(yfg)){
       #genelabels<-c(genelabels, gene_master$full_ocbim[[loc[j]]]) 
     }
   } else {
-    nomatch <- c(nomatch,yfg[[i,2]])
+    nomatch <- c(nomatch,yfg$ocbim[[i]])
   }
   #print(genelist)
 }
@@ -457,13 +464,13 @@ for (i in 1:nrow(yfg)){
 use<- intersect(genelist,unique(cluster.markers$gene)) # overlap between genelist and markers
 
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_yfg-NP.pdf", #change each time
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091321names/sct_yfg-clustermarkers.pdf", #change each time
     width = 10, # The width of the plot in inches
     height = 8)
 p<-DotPlot(all.tree,features=rev(use)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6)) + NoLegend() 
 # p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
 p <- replaceLabelsX(p,gene_master$ggenes,gene_master$merge_desc)
-p <- p+ ggtitle('NP') # change each time
+p <- p+ ggtitle('clustermarkers') # change each time
 print(p)
 dev.off()
 
