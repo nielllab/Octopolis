@@ -320,10 +320,10 @@ dev.off()
 
 ```{r, echo = FALSE, eval = TRUE}
 noID <- read.csv("/Users/josongco/Desktop/ABD/FinalSeqData/genelists_091221/GeneIDs - noID ggene.csv")
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_top30clustersdot.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_top30clustersInclNoIDdot.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
-for (m in 1:1){ #(nlevels((all.tree$seurat_clusters)) - 1)
+for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){ #(nlevels((all.tree$seurat_clusters)) - 1)
   clustermarkers_i <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
   clustermarkers_i$diff_exp <- (clustermarkers_i$pct.1/clustermarkers_i$pct.2)
   clustermarkers_i <- setNames(cbind(rownames(clustermarkers_i), clustermarkers_i, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2", "diff_exp")) 
@@ -334,7 +334,7 @@ for (m in 1:1){ #(nlevels((all.tree$seurat_clusters)) - 1)
   write.csv(top30, clusterName)
    
    print(top30)
-  p<-DotPlot(all.tree,features=top30$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7))
+  p<-DotPlot(all.tree,features=top30$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + NoLegend()
   p<-replaceLabelsX(p,gene_master$ggenes,gene_master$merge_desc)
   p <- p+ ggtitle(paste('top30 for cluster', m, sep = " ")) 
   print(p)  
