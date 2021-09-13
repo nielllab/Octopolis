@@ -143,35 +143,17 @@ replaceLabelsX <- function(p,gene,desc){
     loc<-which(gene==(oldxlabels[[i]]))
     if (length(loc)>0){
       newxlabels[[i]] = paste(oldxlabels[[i]], "-", desc[[loc[1]]])
-      newxlabels[[i]] = substr(newxlabels[[i]],1,50)
-    }
-  }
-  p<- p + scale_x_discrete(labels = newxlabels)
-}
-```
-
-
-```{r, echo = FALSE, eval = TRUE}
-AddLabelsX <- function(p,gene,desc){
-  pp<- ggplot_build(p)
-  oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x$breaks
-  newxlabels = oldxlabels
-  for (i in 1:length(oldxlabels)){
-    loc<-which(gene_master$ggenes==(oldxlabels[[i]]))
-    if (length(loc)>0){
-      newxlabels[[i]] = paste(oldxlabels[[i]], "-", gene_master$merge_desc[[loc[1]]])
-      newxlabels[[i]] = substr(newxlabels[[i]],1,50)
-    }
+      newxlabels[[i]] = substr(newxlabels[[i]],1,50)}}
+    
     for (j in 1:length(newxlabels)){
       inds <- str_detect(newxlabels, "- na")
       if (inds[j] == TRUE){
         loc<-which(noID$ggene==(newxlabels[[j]]))
         newxlabels[[j]] = paste(newxlabels[[j]], "-", noID$Manual_NCBI_BLAST_ID[[j[1]]])
-      } else if (inds[j] == FALSE){
-        newxlabels[[j]] = paste(newxlabels[[j]])}}
-    newxlabels[[j]] = substr(newxlabels[[j]],1,50)}
-  p<- p + scale_x_discrete(labels = newxlabels)
+    }
   }
+  p<- p + scale_x_discrete(labels = newxlabels)
+}
 ```
 
 ```{r, echo = FALSE, eval = TRUE}
@@ -353,8 +335,7 @@ for (m in 1:1){ #(nlevels((all.tree$seurat_clusters)) - 1)
    
    print(top30)
   p<-DotPlot(all.tree,features=top30$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7))
-  #p<-replaceLabelsX(p,gene_master$ggenes,gene_master$merge_desc) ###### IN PROGRESS!!
-  p<-AddLabelsX(p,gene_master$ggenes,gene_master$merge_desc) #### IN PROGRESS!!
+  p<-replaceLabelsX(p,gene_master$ggenes,gene_master$merge_desc)
   p <- p+ ggtitle(paste('top30 for cluster', m, sep = " ")) 
   print(p)  
 }
