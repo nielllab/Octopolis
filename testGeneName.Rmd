@@ -6,7 +6,7 @@ output: html_document
 ```{r}
 
 
-library(Seurat)
+#library(Seurat)
 library(Matrix)
 library(ggplot2)
 library(sctransform)
@@ -15,6 +15,7 @@ library(cowplot) # used for CCA
 library(patchwork) # used for CCA
 library(dplyr) # used for print markers
 library(plotly) # used for 3D mapping of UMAP
+library(googlesheets4)
 ```
 
 ## R Markdown
@@ -24,13 +25,21 @@ This is an R Markdown document. Markdown is a simple formatting syntax for autho
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r}
-gene_master <- read.csv("/Users/crisniell/Desktop/gene lists/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
 
-#cluster.markers <- read.csv("/Users/crisniell/Desktop/Allclustermarkers_hifiasm5cells_std082621.csv", stringsAsFactors = FALSE) #temp master
+gsheet_file <- "https://docs.google.com/spreadsheets/d/1dio9May3vt6svMes9J-uSCZM9q4b-uEu1p3o9eqcttM/edit?usp=sharing"
 
-ggene_ocbim <- read.csv("/Users/crisniell/Desktop/gene lists/GeneIDs - matches.csv", stringsAsFactors = FALSE) #temp master
+gene_master <- read_sheet(gsheet_file,range = "GGene Temp Master") #temp master
 
-genes_id <- read.csv("/Users/crisniell/Desktop/gene lists/GeneIDs - AllGenesIDed.csv", stringsAsFactors = FALSE) #temp master
+ggene_ocbim <- read_sheet(gsheet_file,range = "matches.slop")
+
+genes_id <- read_sheet(gsheet_file,range = "AllGenesIDed")
+
+
+
+```
+
+```{r}
+cluster.markers <- read.csv("/Users/crisniell/Desktop/Allclustermarkers_hifiasm5cells_std082621.csv", stringsAsFactors = FALSE) #temp master
 
 cluster.markers %>%
     group_by(cluster) %>%
@@ -94,12 +103,35 @@ for (i in 1:nrow(gene_master)){
 gg_table$merge_desc <- ''
 for (i in 1:nrow(gg_table)){
   gg_table$merge_desc[i] <- paste(gg_table$full_ob_desc[i],'+',gg_table$manual_desc[i])
+  if (gg_table$merge_desc[i] ==' + '){  # demarcate genes with no identified matches
+    gg_table$merge_desc[i] <-'na'
+  }
 }
 ```
 
 ```{r}
-write.csv(gg_table, "/Users/crisniell/Desktop/gene lists/merged_ggenes.csv")
-#write.csv(gg_table, "/Users/josongco/Desktop/merged_ggenes.csv")
+
+write.csv(gg_table, "/Users/crisniell/Desktop/gene lists/merged_ggenes_slop.csv")
+```
+
+```{r}
+# find genes from top 10 list that don't have ID
+# if not in ggtable or has 'na' as description
+genes <- unique(top10$gene)  # or any other lists of genes (e.g. pcs)
+n<-0
+noID<- tibble()
+noID$gene <-''
+for (g in 1:length(genes)){
+  loc = which(gg_table$ggenes == genes[[g]])
+  if (length(loc)==0 || gg_table$merge_desc[[loc]] == 'na'){  # could add other criteria here, e.g. & not in orthofinder sheet
+    n<-n+1
+  noID<- add_row(noID, gene=genes[[g]])
+  }
+}
+```
+
+```{r}
+write.csv(noID, "/Users/crisniell/Desktop/gene lists/noID.csv")
 ```
 
 
