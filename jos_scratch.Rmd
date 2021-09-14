@@ -144,13 +144,14 @@ replaceLabelsX <- function(p,gene,desc){
     if (length(loc)>0){
       newxlabels[[i]] = paste(oldxlabels[[i]], "-", desc[[loc[1]]])
       newxlabels[[i]] = substr(newxlabels[[i]],1,50)}
-    # else 
-    #   inds<-which(noID$ggene==(oldxlabels[[i]]))
-    # if (length(inds)>0){
-    #   newxlabels[[i]] = paste(newxlabels[[i]], "-", noID$Manual_NCBI_BLAST_ID[[loc[1]]])
-    # }
-    # newxlabels[[i]] = substr(newxlabels[[i]],1,50)
-  }
+    else {
+      for (j in 1:length(newxlabels)){
+        inds<-which(noID$ggene==(newxlabels[[j]]))
+        if (length(inds)>0){
+          newxlabels[[j]] = paste(newxlabels[[j]], "-", noID$Manual_NCBI_BLAST_ID[[inds[1]]])
+        }
+        newxlabels[[j]] = substr(newxlabels[[j]],1,50)
+      }}}
   p<- p + scale_x_discrete(labels = newxlabels)
 }
 ```
@@ -165,11 +166,23 @@ replaceLabelsY <- function(p,gene,desc){
     if (length(loc)> 0) {
       #loc<-which(oldylabels %in% genelabels)
       newylabels[[i]] = paste(oldylabels[[i]], "-", desc[[loc[1]]])
-      newylabels[[i]] = substr(newylabels[[i]],1,50)
-    }
-  }
+      newylabels[[i]] = substr(newylabels[[i]],1,50)}
+    else {
+      for (j in 1:length(newylabels)){
+        inds<-which(noID$ggene==(newylabels[[j]]))
+        if (length(inds)>0){
+          newylabels[[j]] = paste(newylabels[[j]], "-", noID$Manual_NCBI_BLAST_ID[[inds[1]]])
+        }
+        newylabels[[j]] = substr(newylabels[[j]],1,50)
+      }}}
   p<- p + scale_y_discrete(labels = newylabels)
 }
+```
+
+
+```{r}
+NoIDggene <- function(csv, ggene, outs_table)
+  
 ```
 
 
@@ -184,6 +197,7 @@ all <- RunPCA(all, verbose = FALSE)
 #all.genes <- rownames(all@assays$RNA) #RNA 
 #gene_master<- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
 gene_master<- read.csv("/Users/josongco/Desktop/ABD/FinalSeqData/genelists_091221/merged_ggenes.csv", stringsAsFactors = FALSE) #updated 090321 in google drive #merged_ggenes
+noID <- read.csv("/Users/josongco/Desktop/ABD/FinalSeqData/genelists_091221/GeneIDs - noID ggene.csv")
 
 pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_heatmap.pdf",
     width = 8, # The width of the plot in inches
@@ -208,8 +222,8 @@ for (i in 1:50){
   features<-addGeneNamesTable(p$data,p$data$feature, gene_master$ggenes, gene_master$merge_desc)
   print(p)
   print(features)
-  PCName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/", "PC", i, ".csv", sep = "")
-  write.csv(features, PCName)
+  #PCName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/", "PC", i, ".csv", sep = "")
+  #write.csv(features, PCName)
 }
 dev.off()
 
@@ -276,8 +290,8 @@ yfg <- read.csv("~josongco/Desktop/hifiasm_5cells_primary_geneMatches - Sheet1.c
 #yfg <- read.csv("~/Google Drive/miller niell octo seq/project data/hifiasm_5cells_primary_geneMatches.gsheet") # still in progress
 
 all.genes <- rownames(all.tree@assays$RNA) 
-DefaultAssay(all.tree) <- "SCT"
-#DefaultAssay(all.tree) <- "RNA" # standard norm
+#DefaultAssay(all.tree) <- "SCT"
+DefaultAssay(all.tree) <- "RNA" # standard norm
 
 genelist <- vector()
 namelist <- vector()
@@ -321,24 +335,23 @@ dev.off()
 ```
 
 ```{r, echo = FALSE, eval = TRUE}
-noID <- read.csv("/Users/josongco/Desktop/ABD/FinalSeqData/genelists_091221/GeneIDs - noID ggene.csv")
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_top30clustersInclNoIDdot.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091321names/sct_top30clustersInclNoIDdot.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
-for (m in 5:5){ #(nlevels((all.tree$seurat_clusters)) - 1)){ #(nlevels((all.tree$seurat_clusters)) - 1)
+for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){ #(nlevels((all.tree$seurat_clusters)) - 1)
   clustermarkers_i <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
   clustermarkers_i$diff_exp <- (clustermarkers_i$pct.1/clustermarkers_i$pct.2)
   clustermarkers_i <- setNames(cbind(rownames(clustermarkers_i), clustermarkers_i, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2", "diff_exp")) 
   clustermarkers_i %>%
-    top_n(n = 10, wt = diff_exp) ->top10
-   top10<-addGeneNamesTable(top10,top10$geneID,gene_master$ggenes, gene_master$merge_desc)
-     clusterName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/", "cluster", m, "_top10", ".csv", sep = "")
-  #write.csv(top10, clusterName)
+    top_n(n = 30, wt = diff_exp) ->top30
+   top30<-addGeneNamesTable(top30,top30$geneID,gene_master$ggenes, gene_master$merge_desc)
+     clusterName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/", "cluster", m, "_top30", ".csv", sep = "")
+  #write.csv(top30, clusterName)
    
-   print(top10)
-  p<-DotPlot(all.tree,features=top10$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + NoLegend()
+   print(top30)
+  p<-DotPlot(all.tree,features=top30$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + NoLegend()
   p<-replaceLabelsX(p,gene_master$ggenes,gene_master$merge_desc)
-  p <- p+ ggtitle(paste('top10 for cluster', m, sep = " ")) 
+  p <- p+ ggtitle(paste('top30 for cluster', m, sep = " ")) 
   print(p)  
 }
 
@@ -515,3 +528,37 @@ top10<-addGeneNamesTable(top10,yfg)
 top10
 write.csv(top10, "/Users/josongco/Desktop/top10_std_082721.csv")
 ```
+
+```{r, eval = FALSE}
+# generating noID csv
+top30 <- read.csv("/Users/josongco/Desktop/top30_hifiasm5cells_sct091321.csv") 
+for (i in 1:50){
+  PCName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/", "PC", i, ".csv", sep = "")
+  pc <- read.csv(PCName)
+  pc_df <- data_frame(pc$feature, pc$GeneName)
+  genes <- unique(pc_df)
+  n<-0
+noID<- tibble()
+noID$gene <-''
+for (g in 1:length(genes)){
+  loc = which(gg_table$ggenes == genes$`pc$feature`[[g]])
+  if (length(loc)==0 || gg_table$merge_desc[[loc]] == 'na'){  # could add other criteria here, e.g. & not in orthofinder sheet
+    n<-n+1
+  noID<- add_row(noID, gene=genes$`pc$feature`[[g]])
+  fileName = paste("/Users/josongco/Desktop/hifiasm5cells_091321names_", "PCMarkers_NoID", i, ".csv", sep = "")
+  write.csv(noID, fileName)
+  }
+}
+}
+
+write.csv(noID, "/Users/josongco/Desktop/top30_sct_noID.csv")
+
+data_all <- list.files(path = "/Users/josongco/Desktop/sct_NoID",     # Identify all csv files in folder
+                       pattern = "*.csv", full.names = TRUE) %>% 
+  lapply(read.csv) %>%                                            # Store all files in list
+  bind_rows                                                       # Combine data sets into one data set 
+data_all    
+
+write.csv(data_all$gene, "/Users/josongco/Desktop/sct_PCnTop30_noID.csv")
+```
+
