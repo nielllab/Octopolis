@@ -475,7 +475,7 @@ top30<-addGeneNamesTable(top30,top30$gene,gene_master$ggenes, gene_master$merge_
 #write.csv(cluster.markers, "/Users/josongco/Desktop/Allclustermarkers_hifiasm5cells_sct082621.csv")
 #
 
-write.csv(top30, "/Users/josongco/Desktop/top30_hifiasm5cells_sct091321.csv") # cluster markers from 082621
+write.csv(top30, "/Users/josongco/Desktop/top30_hifiasm5cells_sct091521.csv") # cluster markers from 082621
 ```
 
 
@@ -538,11 +538,14 @@ pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091321names/s
     width = 8, # The width of the plot in inches
     height = 5)
 for (i in 1:length(genelist)){
-  fp <- FeaturePlot(all.tree, features = yfg$ggene[i], ncol = 1) + NoAxes()
+  fp <- FeaturePlot(all.tree, features = yfg$ggene[44], ncol = 1) + NoAxes()
   fp <- fp+ ggtitle(yfg$GeneName[i])
   print(fp)
 }
 dev.off()
+
+print(p)
+print(fp)
 
 #write.csv(markers, "/Users/josongco/Desktop/markers_hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_StdCCA_omitdims.csv")
 ```
