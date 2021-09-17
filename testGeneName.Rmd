@@ -28,15 +28,24 @@ When you click the **Knit** button a document will be generated that includes bo
 
 gsheet_file <- "https://docs.google.com/spreadsheets/d/1dio9May3vt6svMes9J-uSCZM9q4b-uEu1p3o9eqcttM/edit?usp=sharing"
 
-gene_master <- read_sheet(gsheet_file,range = "GGene Temp Master") #temp master
+gene_manual <- read_sheet(gsheet_file,range = "Manual ggene annotation") #temp master
 
 ggene_ocbim <- read_sheet(gsheet_file,range = "matches.slop")
 
 genes_id <- read_sheet(gsheet_file,range = "AllGenesIDed")
 
+top10<- read_sheet(gsheet_file,range = "Top30")
+
+all_ggene <-read_sheet(gsheet_file,range = "allGeneDescriptions")
+noID_ortho <- read_sheet(gsheet_file,range = "noID ggene")
 
 
 ```
+
+```{r}
+ncbi<- read.csv("/Users/crisniell/Desktop/gene lists/gene_result.csv", stringsAsFactors=FALSE)
+```
+
 
 ```{r}
 cluster.markers <- read.csv("/Users/crisniell/Desktop/Allclustermarkers_hifiasm5cells_std082621.csv", stringsAsFactors = FALSE) #temp master
@@ -51,13 +60,13 @@ cluster.markers %>%
 ```{r}
 # add ocbim-based gene assignments into table
 # by combining minimap ggenes->ocbim with genes_IDed ocbim->desc 
-ggenes = unique(ggene_ocbim$g_gene)
-length(ggenes)
-gg_table <- tibble(ggenes)
+ggene = unique(all_ggene$ggene)
+length(ggene)
+gg_table <- tibble(ggene)
 gg_table$full_ocbim <- ''
 gg_table$full_ob_desc <- ''
-for (g in 1:length(ggenes)){
-  loc = which(ggene_ocbim$g_gene == ggenes[[g]])
+for (g in 1:length(ggene)){
+  loc = which(ggene_ocbim$ggene == ggene[[g]])
   full_ob <- ''
   full_desc <- ''
   for (i in 1:length(loc)){
@@ -83,27 +92,81 @@ for (g in 1:length(ggenes)){
 ```
 
 ```{r}
-# add the manual gene assignments into the table
-gg_table$manual_desc <-''
-for (i in 1:nrow(gene_master)){
-  loc = which(gg_table$ggenes == gene_master$g_gene[i])
-  if (length(loc) ==1){
-    gg_table$manual_desc[loc] <- gene_master$gene_desc[i]
+# add ncbi assignments
+gg_table$full_ncbi_desc <- '' 
+for (g in 1:length(ggene)){
+  loc = which(ggene_ocbim$ggene == ggene[[g]])
+  full_ob <- ''
+  full_desc <- ''
+  if  (length(loc)>0) {
+    for (i in 1:length(loc)){
+      ob <- ggene_ocbim$ocbim[loc[i]]
+      loc2 <- grep( substr(ob,7,14), ncbi$Aliases)
+      full_ob <- paste (full_ob, '-',ob)
+      if (length(loc2)>0){  # only uses first one. could iterate over loc2
+        nm = ncbi$description[loc2[1]]
+        if (!grepl("uncharacterized LOC",nm))
+            {
+              if (full_desc==''){
+                full_desc <- nm
+              }
+              else{
+                full_desc <- paste(full_desc,'-',nm) 
+              }
+        }
+      }
+    }
   }
-  else {
-    print(gene_master$g_gene[i])
-    gg_table<-add_row(gg_table, ggenes = gene_master$g_gene[i],manual_desc = gene_master$gene_desc[i])
-  }
+  
+  gg_table$full_ncbi_desc[g] <- full_desc
+  
 }
 ```
+
+
+```{r}
+# add the manual gene assignments into the table
+gg_table$manual_desc <-''
+for (i in 1:nrow(gene_manual)){
+  loc = which(gg_table$ggene == gene_manual$ggene[i])
+  if (length(loc) ==1){
+    gg_table$manual_desc[loc] <- paste(gg_table$manual_desc[loc],'-',gene_manual$gene_desc[i])
+  }
+  # if you want to add any that aren't in ggenes
+  #else {
+  #  if (length(gg_table$ggene[i])>1){   # remove NA
+  #    print(gene_manual$ggene[i])
+  #    gg_table<-add_row(gg_table, ggene = gene_manual$ggene[i],manual_desc = gene_manual$gene_desc[i])
+  #  }
+  #}
+}
+```
+
+```{r}
+# add the manual blast assignments into the table
+gg_table$blast_desc <-''
+gg_table$ortho_desc <-''
+for (i in 1:nrow(noID_ortho)){
+  loc = which(gg_table$ggene == noID_ortho$ggene[i])
+    if (length(loc)==1){
+      gg_table$blast_desc[loc] <- noID_ortho$Manual_NCBI_BLAST_ID[i]
+      gg_table$ortho_desc[loc] <- noID_ortho$putative_orthofinder_id_manual[i]
+    }
+ #     else {
+#    print(noID_ortho$ggene[i])
+#    gg_table<-add_row(gg_table, ggene = noID_ortho$ggene[i],manual_desc = noID_ortho$Manual_NCBI_BLAST_ID[i])
+#  }
+}
+```
+
 
 ```{r}
 # merge the ocbim-based descriptions and manual descriptions
 # gg_table <- read.csv("/Users/josongco/Desktop/GeneIDs - gg_table.csv", stringsAsFactors = FALSE) # read in spreadsheet from google drive and overwrite manual description to exclude "na"
 gg_table$merge_desc <- ''
 for (i in 1:nrow(gg_table)){
-  gg_table$merge_desc[i] <- paste(gg_table$full_ob_desc[i],'+',gg_table$manual_desc[i])
-  if (gg_table$merge_desc[i] ==' + '){  # demarcate genes with no identified matches
+  gg_table$merge_desc[i] <- paste(gg_table$manual_desc[i], '_', gg_table$full_ncbi_desc[i], '_', gg_table$full_ob_desc[i],'_',gg_table$blast_desc[i] ,'_',gg_table$ortho_desc[i])
+  if (gg_table$merge_desc[i] ==' _  _  _  _ '){  # demarcate genes with no identified matches
     gg_table$merge_desc[i] <-'na'
   }
 }
@@ -111,18 +174,21 @@ for (i in 1:nrow(gg_table)){
 
 ```{r}
 
-write.csv(gg_table, "/Users/crisniell/Desktop/gene lists/merged_ggenes_slop.csv")
+write.csv(gg_table, "/Users/crisniell/Desktop/gene lists/merged_ggenes_ncbi.csv")
+
+#sheet_write(gg_table, gsheet_file,sheet='gg_table')
 ```
 
 ```{r}
 # find genes from top 10 list that don't have ID
 # if not in ggtable or has 'na' as description
+top10<- read_sheet(gsheet_file,range = "Top30")
 genes <- unique(top10$gene)  # or any other lists of genes (e.g. pcs)
 n<-0
 noID<- tibble()
 noID$gene <-''
 for (g in 1:length(genes)){
-  loc = which(gg_table$ggenes == genes[[g]])
+  loc = which(gg_table$ggene == genes[[g]])
   if (length(loc)==0 || gg_table$merge_desc[[loc]] == 'na'){  # could add other criteria here, e.g. & not in orthofinder sheet
     n<-n+1
   noID<- add_row(noID, gene=genes[[g]])
@@ -131,7 +197,22 @@ for (g in 1:length(genes)){
 ```
 
 ```{r}
-write.csv(noID, "/Users/crisniell/Desktop/gene lists/noID.csv")
+# add non-IDed onto noID sheet
+noID_ortho <- read_sheet(gsheet_file,range = "noID ggene")
+for (g in 1:length(noID$gene)){
+  loc =which(noID_ortho$ggene == noID$gene[[g]])
+  if (length(loc)==0){
+    loc2 = which(all_ggene$ggene == noID$gene[g])
+    noID_ortho <- add_row(noID_ortho, ggene =noID$gene[g], orthogroup =all_ggene$ortho_group[loc2],putative_orthofinder_id=all_ggene$ortho_names[loc2] )
+
+  }
+}
+```
+
+
+```{r}
+#write.csv(noID, "/Users/crisniell/Desktop/gene lists/noID.csv")
+sheet_write(noID_ortho,gsheet_file,sheet = "noID ggene")
 ```
 
 
