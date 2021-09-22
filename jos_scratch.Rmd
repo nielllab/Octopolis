@@ -185,7 +185,7 @@ replaceLabelsY <- function(p,gene,desc){
 gsheet_file <- "https://docs.google.com/spreadsheets/d/1dio9May3vt6svMes9J-uSCZM9q4b-uEu1p3o9eqcttM/edit?usp=sharing" #GeneID google spreadsheet
 gene_master <- read_sheet(gsheet_file,range = "gg_table") # gene_master doc
 noID <- read_sheet(gsheet_file,range = "noID ggene")
-top30 <- read_sheet(gsheet_file,range = "top30")
+#top30 <- read_sheet(gsheet_file,range = "top30")
 genesofint <- read_sheet(gsheet_file,range = "cluster markers")
 ```
 
@@ -201,38 +201,38 @@ all <- RunPCA(all, verbose = FALSE)
 #all.genes <- rownames(all@assays$SCT) #sctransform
 #all.genes <- rownames(all@assays$RNA) #RNA 
 #gene_master<- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
-gene_master<- read.csv("/Users/josongco/Desktop/ABD/FinalSeqData/genelists_091221/merged_ggenes.csv", stringsAsFactors = FALSE) #updated 090321 in google drive #merged_ggenes
-noID <- read.csv("/Users/josongco/Desktop/ABD/FinalSeqData/genelists_091221/GeneIDs - noID ggene.csv")
+#gene_master<- read.csv("/Users/josongco/Desktop/ABD/FinalSeqData/genelists_091221/merged_ggenes.csv", stringsAsFactors = FALSE) #updated 090321 in google drive #merged_ggenes
+#noID <- read.csv("/Users/josongco/Desktop/ABD/FinalSeqData/genelists_091221/GeneIDs - noID ggene.csv")
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_heatmap.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_heatmap.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
 for (i in 1:50){
   p <- DimHeatmap(all, dims = i, cells = 500, balanced = TRUE, fast = FALSE)
-  p <- replaceLabelsY(p, gene_master$ggenes, gene_master$merge_desc)
+  p <- replaceLabelsY(p, gene_master$ggene, gene_master$merge_desc)
   p <- p+ ggtitle(paste('PC', i, sep = " ")) 
-  features<-addGeneNamesTable(p$data,p$data$Feature, gene_master$ggenes, gene_master$merge_desc)
+  features<-addGeneNamesTable(p$data,p$data$Feature, gene_master$ggene, gene_master$merge_desc)
   print(p)
   print(features)
 }
 dev.off()
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_vizdim.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_vizdim.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
 for (i in 1:50){
   p <- VizDimLoadings(all, dims = i, combine = TRUE)
-  p <- replaceLabelsY(p, gene_master$ggenes, gene_master$merge_desc)
+  p <- replaceLabelsY(p, gene_master$ggene, gene_master$merge_desc)
   p <- p+ ggtitle(paste('PC', i, sep = " ")) 
-  features<-addGeneNamesTable(p$data,p$data$feature, gene_master$ggenes, gene_master$merge_desc)
+  features<-addGeneNamesTable(p$data,p$data$feature, gene_master$ggene, gene_master$merge_desc)
   print(p)
   print(features)
-  #PCName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/", "PC", i, ".csv", sep = "")
+  #PCName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/", "PC", i, ".csv", sep = "")
   #write.csv(features, PCName)
 }
 dev.off()
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_elbow.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_elbow.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
 ElbowPlot(all, ndims = 50) # omit ndims = DMset
@@ -240,8 +240,9 @@ dev.off()
 
 all <- JackStraw(all, dims = 50) # dims max depends on how many pcs originally calculated
 all <- ScoreJackStraw(all, dims = 1:50)
+JackStrawPlot(all, dims = 1:50)
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_jackstraw50.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_jackstraw50.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
 JackStrawPlot(all, dims = 1:50)
@@ -258,7 +259,7 @@ all <- FindClusters(all, verbose = FALSE)
 # vs all <- FindNeighbors(all, dims = DM) 
 # vs all <- FindClusters(all, resolution = 1)
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_umap.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_umap.pdf",
     width = 8, # The width of the plot in inches
     height = 5)
 DimPlot(all, reduction = "umap", label = TRUE) 
@@ -267,7 +268,7 @@ dev.off()
 ```
 
 ```{r, echo = TRUE}
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_hierarchicaltree_umap.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_hierarchicaltree_umap.pdf",
     width = 8, # The width of the plot in inches
     height = 5)
 all.tree <- BuildClusterTree(all, reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = DM)
@@ -288,7 +289,7 @@ dev.off()
 ```
 
 ```{r, echo = FALSE, eval = TRUE}
-## hifiasm 5 cells
+## hifiasm 5 cells / included in cluster markers, so can skip this chunk of code
 
 yfg <- read.csv("~josongco/Desktop/hifiasm_5cells_primary_geneMatches - Sheet1.csv",stringsAsFactors=FALSE) # change gene list depending on genes of interest
 
@@ -318,7 +319,7 @@ for (i in 1:nrow(yfg)){
   #print(genelist)
 }
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_insitugenes_dot.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_insitugenes_dot.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
 p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()
@@ -340,8 +341,8 @@ dev.off()
 ```
 
 ```{r, echo = FALSE, eval = TRUE}
-#### NEEDS TO BE UPDATED
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091321names/sct_top30clustersInclNoIDdot.pdf",
+DefaultAssay(all.tree) <- "SCT"
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_top30clustersInclNoIDdot_sctassay.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
 for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){ #(nlevels((all.tree$seurat_clusters)) - 1)
@@ -350,13 +351,13 @@ for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){ #(nlevels((all.tree$seur
   clustermarkers_i <- setNames(cbind(rownames(clustermarkers_i), clustermarkers_i, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2", "diff_exp")) 
   clustermarkers_i %>%
     top_n(n = 30, wt = diff_exp) ->top30
-   top30<-addGeneNamesTable(top30,top30$geneID,gene_master$ggenes, gene_master$merge_desc)
-     clusterName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/", "cluster", m, "_top30", ".csv", sep = "")
+   top30<-addGeneNamesTable(top30,top30$geneID,gene_master$ggene, gene_master$merge_desc)
+     clusterName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/", "cluster", m, "_top30", ".csv", sep = "")
   write.csv(top30, clusterName)
    
    print(top30)
-  p<-DotPlot(all.tree@assays[["SCT"]],features=top30$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + NoLegend()
-  p<-replaceLabelsX(p,gene_master$ggenes,gene_master$merge_desc)
+  p<-DotPlot(all.tree,features=top30$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + NoLegend()
+  p<-replaceLabelsX(p,gene_master$ggene,gene_master$merge_desc)
   p <- p+ ggtitle(paste('top30 for cluster', m, sep = " ")) 
   print(p)  
 }
@@ -390,40 +391,61 @@ dev.off()
 
 #saveRDS(markers_list, "/Users/josongco/Desktop/clustermarkers_hifiasm5cells_std082621.rds")
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_nodesdot.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_treeclustermarkersnodesdot_allSctAssay.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
+PlotClusterTree(all.tree, label = TRUE)
+
+DefaultAssay(all.tree) <- "SCT"
+cl<-DotPlot(all.tree,features=rev(genelist$ggene)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6)) + NoLegend() 
+# The following requested variables were not found: G4907, G15066, G1766
+# p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
+cl <- replaceLabelsX(cl,gene_master$ggene,gene_master$merge_desc)
+cl <- cl+ ggtitle('clustermarkers') # change each time
+print(cl)
+
 nodes <- unique(all.tree@tools$BuildClusterTree$edge[,1])
 for (n in 1:length(nodes)){ 
+
   nodemarkersROC <- FindMarkers(all.tree, ident.1 = "clustertree", ident.2 = nodes[n], logfc.threshold = 0.25, test.use = "roc", only.pos = FALSE)
   nodemarkersROC <- setNames(cbind(rownames(nodemarkersROC), nodemarkersROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
   nodemarkersROC$diff_exp <- (nodemarkersROC$pct.1/nodemarkersROC$pct.2)
   nodemarkersROC %>%
-    top_n(n = 30, wt = myAUC) ->top30node
-  top30node<-addGeneNamesTable(top30node,top30node$geneID,gene_master$ggenes, gene_master$merge_desc)
-  nodeName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/", "node", n, "_top30", ".csv", sep = "")
+    top_n(n = 30, wt = power) ->top30node
+  top30node<-addGeneNamesTable(top30node,top30node$geneID,gene_master$ggene, gene_master$merge_desc)
+  nodeName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/", "node", n+45, "_top30", ".csv", sep = "")
   write.csv(top30node, nodeName)
- 
-  print(top30node)
-  q<-DotPlot(all.tree@assays[["SCT"]],features=top30node$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7))
-  q<-replaceLabelsX(q,gene_master$ggenes,gene_master$merge_desc)
-  q <- q+ ggtitle(paste('top30 for node', n, sep = " ")) 
-  print(q)  
   
    nodemarkersROC %>%
-    top_n(n = -30, wt = myAUC) ->bottom30node
-  bottom30node<-addGeneNamesTable(bottom30node,bottom30node$geneID,gene_master$ggenes, gene_master$merge_desc)
-  nodeName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/", "node", n, "_bottom30", ".csv", sep = "")
+    top_n(n = -30, wt = power) ->bottom30node
+  bottom30node<-addGeneNamesTable(bottom30node,bottom30node$geneID,gene_master$ggene, gene_master$merge_desc)
+  nodeName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/", "node", n+45, "_bottom30", ".csv", sep = "")
   write.csv(bottom30node, nodeName)
+
+  
+    print(top30node)
+  q<-DotPlot(all.tree,features=top30node$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7))
+  q<-replaceLabelsX(q,gene_master$ggene,gene_master$merge_desc)
+  q <- q+ ggtitle(paste('top30 for node', n+45, sep = " ")) 
+  print(q)  
+  
   
   print(bottom30node)
-  p<-DotPlot(all.tree@assays[["SCT"]],features=bottom30node$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7))
-  p<-replaceLabelsX(p,gene_master$ggenes,gene_master$merge_desc)
-    p <- p+ ggtitle(paste('bottom30 for node', n, sep = " ")) 
+  p<-DotPlot(all.tree,features=bottom30node$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7))
+  p<-replaceLabelsX(p,gene_master$ggene,gene_master$merge_desc)
+    p <- p+ ggtitle(paste('bottom30 for node', n+45, sep = " ")) 
   print(p)  
 }
 
 dev.off()
+
+
+
+
+Library(ggplot2)
+DotPlot(all, features = c("gjc4b", "gja1b")) +  theme(axis.text.x = element_text(angle = 45, hjust=1, size = 15)) +
+  scale_x_discrete(limits=c("gja1b", "gjc4b”)) +
+  scale_y_discrete(limits=c("156", "138")) + theme(axis.text.y = element_text(angle = 45, hjust=1, size = 5))
 ```
 
 
@@ -435,33 +457,34 @@ nodes <- unique(all.tree@tools$BuildClusterTree$edge[,1])
  dopaNodeROC <- FindMarkers(all.tree, ident.1 = "clustertree", ident.2 = nodes[8], logfc.threshold = 0.25, test.use = "roc", only.pos = FALSE) # not only pos
  dopaNodeROC <- setNames(cbind(rownames(dopaNodeROC),dopaNodeROC, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2"))
  dopaNodeROC$diff_exp <- (dopaNodeROC$pct.1/dopaNodeROC$pct.2)
- dopaNodeROC <- addGeneNamesTable(dopaNodeROC,dopaNodeROC$geneID,gene_master$ggenes, gene_master$merge_desc)
+ dopaNodeROC <- addGeneNamesTable(dopaNodeROC,dopaNodeROC$geneID,gene_master$ggene, gene_master$merge_desc)
  
  write.csv(dopaNodeROC, "/Users/josongco/Desktop/dopaNodeROCtest.csv")
  
  dopaNodeROC %>%
     top_n(n = 30, wt = myAUC) ->top30dopaPower
-  nodeName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/", "node", n, "_top30", ".csv", sep = "")
+  nodeName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/", "node", n, "_top30", ".csv", sep = "")
   write.csv(top30, nodeName)
  
   DefaultAssay(all.tree) <- "SCT"
   
     dopaNodeROC %>%
     top_n(n = -30, wt = myAUC) ->bottom30dopa
-  nodeName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/", "node", n, "_bottom30", ".csv", sep = "")
+  nodeName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/", "node", n, "_bottom30", ".csv", sep = "")
   write.csv(bottom30, nodeName)
   
+
   
   print(top30dopa)
   q<-DotPlot(all.tree,features=top30dopa$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7))
-  q<-replaceLabelsX(q,gene_master$ggenes,gene_master$merge_desc)
+  q<-replaceLabelsX(q,gene_master$ggene,gene_master$merge_desc)
   q <- q+ ggtitle(paste('top30 for node', n, sep = " ")) 
   print(q)  
 
   
   print(bottom30)
   p<-DotPlot(all.tree,features=bottom30dopa$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7))
-  p<-replaceLabelsX(p,gene_master$ggenes,gene_master$merge_desc)
+  p<-replaceLabelsX(p,gene_master$ggene,gene_master$merge_desc)
     p <- p+ ggtitle(paste('bottom30 for node', n, sep = " ")) 
   print(p)
   
@@ -479,8 +502,8 @@ cluster.markers <- read.csv("/Users/josongco/Desktop/Allclustermarkers_hifiasm5c
 #cluster.markers$diff_exp <- (cluster.markers$pct.1/cluster.markers$pct.2)
 cluster.markers %>%
     group_by(cluster) %>%
-    top_n(n = 10, wt = diff_exp) ->top30
-top30<-addGeneNamesTable(top30,top30$gene,gene_master$ggenes, gene_master$merge_desc)
+    top_n(n = 30, wt = diff_exp) ->top30
+top30<-addGeneNamesTable(top30,top30$gene,gene_master$ggene, gene_master$merge_desc)
 
 #write.csv(cluster.markers, "/Users/josongco/Desktop/Allclustermarkers_hifiasm5cells_std082621.csv")
 #write.csv(cluster.markers, "/Users/josongco/Desktop/Allclustermarkers_hifiasm5cells_sct082621.csv")
@@ -511,7 +534,7 @@ for (i in 1:nrow(yfg)){
   # loc <- which(gene_master$full_ocbim ==gene)
   if (length(loc)>0 & str_length(gene)>0) {
     for (j in 1:length(loc)){
-      genelist <- c(genelist,gene_master$ggenes[loc[j]])
+      genelist <- c(genelist,gene_master$ggene[loc[j]])
       #namelist <- c(namelist, C2H2s[[i,5]])
       #genelabels<-c(genelabels, gene_master$full_ocbim[[loc[j]]]) 
     }
@@ -525,19 +548,19 @@ for (i in 1:nrow(yfg)){
 use<- intersect(genelist,unique(cluster.markers$gene)) # overlap between genelist and markers
 
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091321names/sct_yfg-insitugenes_dot.pdf", #change each time
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_yfg-insitugenes_dot.pdf", #change each time
     width = 10, # The width of the plot in inches
     height = 8)
 p<-DotPlot(all.tree,features=rev(use$ggene)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6)) + NoLegend() 
 # The following requested variables were not found: G4907, G15066, G1766
 # p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
-p <- replaceLabelsX(p,gene_master$ggenes,gene_master$merge_desc)
+p <- replaceLabelsX(p,gene_master$ggene,gene_master$merge_desc)
 p <- p+ ggtitle('clustermarkers') # change each time
 print(p)
 dev.off()
 
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091321names/sct_yfg-insitugenes_feat.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_yfg-insitugenes_feat.pdf",
     width = 8, # The width of the plot in inches
     height = 5)
 for (i in 1:length(genelist)){
@@ -552,27 +575,22 @@ dev.off()
 ## cluster markers
 genelist <- genesofint$ggene
 #use<- data_frame(intersect(genelist,unique(cluster.markers$gene))) # overlap between genelist and markers
-genelist <- addGeneNamesTable(genesofint,genesofint$ggene,gene_master$ggenes, gene_master$merge_desc)
+genelist <- addGeneNamesTable(genesofint,genesofint$ggene,gene_master$ggene, gene_master$merge_desc)
 
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091321names/sct_yfg-clustermarkers_updated091421_dot.pdf", #change each time
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_yfg-clustermarkers_dotfeat.pdf", #change each time
     width = 10, # The width of the plot in inches
     height = 8)
-p<-DotPlot(all.tree,features=rev(yfg$ggene)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6)) + NoLegend() 
+cl<-DotPlot(all.tree,features=rev(genelist$ggene)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6)) + NoLegend() 
 # The following requested variables were not found: G4907, G15066, G1766
 # p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
-p <- replaceLabelsX(p,gene_master$ggenes,gene_master$merge_desc)
-p <- p+ ggtitle('clustermarkers') # change each time
-print(p)
-dev.off()
+cl <- replaceLabelsX(cl,gene_master$ggene,gene_master$merge_desc)
+cl <- cl+ ggtitle('clustermarkers') # change each time
+print(cl)
 
-
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091321names/sct_yfg-clustermarkers_updated091421_geneName_feat.pdf",
-    width = 8, # The width of the plot in inches
-    height = 5)
 for (i in 1:length(genelist)){
-  fp <- FeaturePlot(all.tree, features = yfg$ggene[i], ncol = 1) + NoAxes()
-  fp <- fp+ ggtitle(yfg$GeneName[i])
+  fp <- FeaturePlot(all.tree, features = genelist$ggene[i], ncol = 1) + NoAxes()
+  fp <- fp+ ggtitle(genelist$GeneName[i])
   print(fp)
 }
 dev.off()
@@ -625,7 +643,7 @@ write.csv(top10, "/Users/josongco/Desktop/top10_std_082721.csv")
 top30 <- read.csv("/Users/josongco/Desktop/top30_hifiasm5cells_sct091321.csv") 
 top10 <- read.csv("/Users/josongco/Desktop/top10_std_082721.csv") 
 for (i in 1:50){
-  PCName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/", "PC", i, ".csv", sep = "")
+  PCName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/", "PC", i, ".csv", sep = "")
   pc <- read.csv(PCName)
   pc_df <- data_frame(pc$feature, pc$GeneName)
   genes <- unique(pc_df)
@@ -637,7 +655,7 @@ for (g in 1:length(genes)){
   if (length(loc)==0 || gg_table$merge_desc[[loc]] == 'na'){  # could add other criteria here, e.g. & not in orthofinder sheet
     n<-n+1
   noID<- add_row(noID, gene=genes$`pc$feature`[[g]])
-  fileName = paste("/Users/josongco/Desktop/hifiasm5cells_091321names_", "PCMarkers_NoID", i, ".csv", sep = "")
+  fileName = paste("/Users/josongco/Desktop/hifiasm5cells_092121names_", "PCMarkers_NoID", i, ".csv", sep = "")
   write.csv(noID, fileName)
   }
 }
@@ -659,19 +677,83 @@ write.csv(data_all$gene, "/Users/josongco/Desktop/sct_PCnTop30_noID.csv")
 noID<- tibble()
 noID$gene <-''
 for (g in 1:length(genes)){
-  loc = which(gene_master$ggenes == genes$gene[[g]])
+  loc = which(gene_master$ggene == genes$gene[[g]])
   if (length(loc)==0 || gene_master$merge_desc[[loc]] == 'na'){  # could add other criteria here, e.g. & not in orthofinder sheet
     n<-n+1
   noID<- add_row(noID, gene=genes$gene[[g]])}}
+
+
+
+combined <- rbind(df1, df2)
 ```
 
 ```{r}
 # subset data based on identity class: neurons only
+# 
+# plot all
+
+noJunk <- subset(x = all.tree, idents=27, invert = TRUE)
+DefaultAssay(noJunk) <- "integrated"
+noJunk <- RunUMAP(noJunk, dims = DM, verbose = FALSE)
+
 neurons <- subset(x = all.tree, idents=4:40)
 DefaultAssay(neurons) <- "integrated"
 neurons <- RunUMAP(neurons, dims = DM, verbose = FALSE)
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091321names/sct_subsetNeurons_umap.pdf",
+neuronsNoJunk <- subset(x = neurons, idents = 27, invert = TRUE)
+DefaultAssay(neuronsNoJunk) <- "integrated"
+neuronsNoJunk <- RunUMAP(neuronsNoJunk, dims = DM, verbose = FALSE)
+
+Matureneurons <- subset(x = neurons, idents = 21:33, invert = TRUE)
+DefaultAssay(Matureneurons) <- "integrated"
+Matureneurons <- RunUMAP(Matureneurons, dims = DM, verbose = FALSE)
+
+developingneurons <- subset(x = all.tree, idents=21:33)
+DefaultAssay(developingneurons) <- "integrated"
+developingneurons <- RunUMAP(developingneurons, dims = DM, verbose = FALSE)
+
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_subsettingplots_noOrigIdent_umap.pdf",
+    width = 8, # The width of the plot in inches
+    height = 5)
+
+DimPlot(all.tree, reduction = "umap", label = TRUE) + ggtitle('noSubset')
+#DimPlot(all.tree, reduction = "umap", group.by = "orig.ident") + ggtitle('noSubset, by orig.ident')
+
+DimPlot(noJunk, reduction = "umap", label = TRUE) + ggtitle('noJunk')
+#DimPlot(noJunk, reduction = "umap", group.by = "orig.ident") + ggtitle('noJunk, by orig.ident')
+
+DimPlot(neurons, reduction = "umap", label = TRUE) + ggtitle('neurons')
+#DimPlot(neurons, reduction = "umap", group.by = "orig.ident") + ggtitle('neurons, by orig.ident')
+
+DimPlot(neuronsNoJunk, reduction = "umap", label = TRUE) + ggtitle('neuronsNoJunk')
+#DimPlot(neuronsNoJunk, reduction = "umap", group.by = "orig.ident") + ggtitle('neuronsNoJunk, by orig.ident')
+
+DimPlot(Matureneurons, reduction = "umap", label = TRUE) + ggtitle('mature neurons')
+#DimPlot(Matureneurons, reduction = "umap", group.by = "orig.ident") + ggtitle('mature neurpns, by orig.ident')
+
+DimPlot(developingneurons, reduction = "umap", label = TRUE) + ggtitle('developing neurons')
+#DimPlot(developingneurons, reduction = "umap", group.by = "orig.ident") + ggtitle('developing neurons, by orig.ident')
+
+dev.off()
+ 
+noJunk <- subset(x = all.tree, idents=27, invert = TRUE)
+DefaultAssay(noJunk) <- "integrated"
+noJunk <- RunUMAP(noJunk, dims = DM, verbose = FALSE)
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_subsetnoJunk_umap.pdf",
+    width = 8, # The width of the plot in inches
+    height = 5)
+DimPlot(noJunk, reduction = "umap", label = TRUE) 
+DimPlot(noJunk, reduction = "umap", group.by = "orig.ident") 
+dev.off()
+
+DimPlot(noJunk, reduction = "umap", label = TRUE) + ggtitle('noJunk')
+
+
+neurons <- subset(x = all.tree, idents=4:40)
+DefaultAssay(neurons) <- "integrated"
+neurons <- RunUMAP(neurons, dims = DM, verbose = FALSE)
+
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_subsetNeurons_umap.pdf",
     width = 8, # The width of the plot in inches
     height = 5)
 DimPlot(neurons, reduction = "umap", label = TRUE) 
@@ -679,12 +761,23 @@ DimPlot(neurons, reduction = "umap", group.by = "orig.ident")
 dev.off()
 
 
+neuronsNoJunk <- subset(x = neurons, idents = 27, invert = TRUE)
+DefaultAssay(neuronsNoJunk) <- "integrated"
+neuronsNoJunk <- RunUMAP(neuronsNoJunk, dims = DM, verbose = FALSE)
+
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_subsetNeuronsNoJunk_umap.pdf",
+    width = 8, # The width of the plot in inches
+    height = 5)
+DimPlot(neuronsNoJunk, reduction = "umap", label = TRUE) 
+DimPlot(neuronsNoJunk, reduction = "umap", group.by = "orig.ident") 
+dev.off()
+
 
 Matureneurons <- subset(x = neurons, idents = 21:33, invert = TRUE)
 DefaultAssay(Matureneurons) <- "integrated"
 Matureneurons <- RunUMAP(Matureneurons, dims = DM, verbose = FALSE)
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091321names/sct_subsetMatureNeurons_umap.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_subsetMatureNeurons_umap.pdf",
     width = 8, # The width of the plot in inches
     height = 5)
 DimPlot(Matureneurons, reduction = "umap", label = TRUE) 
@@ -697,7 +790,7 @@ developingneurons <- subset(x = all.tree, idents=21:33)
 DefaultAssay(developingneurons) <- "integrated"
 developingneurons <- RunUMAP(developingneurons, dims = DM, verbose = FALSE)
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091321names/sct_subsetdevelopingneurons_umap.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_subsetdevelopingneurons_umap.pdf",
     width = 8, # The width of the plot in inches
     height = 5)
 DimPlot(developingneurons, reduction = "umap", label = TRUE) 
@@ -709,7 +802,7 @@ cholinergic <- subset(x = all.tree, idents=13:15)
 DefaultAssay(cholinergic) <- "integrated"
 cholinergic <- RunUMAP(cholinergic, dims = DM, verbose = FALSE)
 
-pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091321names/sct_subsetcholinergic_umap.pdf",
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/sct_subsetcholinergic_umap.pdf",
     width = 8, # The width of the plot in inches
     height = 5)
 DimPlot(cholinergic, reduction = "umap", label = TRUE) 
@@ -717,6 +810,104 @@ DimPlot(cholinergic, reduction = "umap", group.by = "orig.ident")
 dev.off()
 ```
 
+```{r}
+# looping through significant PCs based on jackstraw
+
+all2 <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_SctCCA_omitdims.rds")
+
+#sigpc = c(1:12, 15, 16, 18, 19, 20, 21, 22, 24) #significant pcs
+
+all2 <- RunPCA(all2, verbose = FALSE)
+
+pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_092121names/umaploops_clustermarkers.pdf",
+    width = 8, # The width of the plot in inches
+    height = 5)
+
+for (l in 2:12){
+  
+  pc1_12 <- RunUMAP(all2, dims = 1:l, verbose = FALSE)
+  pc1_12 <- FindNeighbors(pc1_12 , dims = 1:l, verbose = FALSE)
+  pc1_12 <- FindClusters(pc1_12 , verbose = FALSE)
+  pc1_12.tree <- BuildClusterTree(pc1_12 , reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = 1:l)
+  DimPlot(pc1_12.tree, reduction = "umap", label = TRUE) + plot_annotation(title = paste('umap for 1:', l, 'PCs', sep=""))
+  PlotClusterTree(pc1_12.tree, label = TRUE) 
+  
+  genelist <- genesofint$ggene
+  genelist <- addGeneNamesTable(genesofint,genesofint$ggene,gene_master$ggene, gene_master$merge_desc)
+  
+  cl<-DotPlot(pc1_12.tree,features=rev(genelist$ggene)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6)) + NoLegend() 
+  cl <- replaceLabelsX(cl,gene_master$ggene,gene_master$merge_desc)
+  cl <- cl+ ggtitle('clustermarkers') # change each time
+  print(cl)}
+  
+  pc15 <- RunUMAP(all2, dims = c(1:12, 15), verbose = FALSE)
+  pc15 <- FindNeighbors(pc15 , dims = c(1:12, 15), verbose = FALSE)
+  pc15 <- FindClusters(pc15 , verbose = FALSE)
+  pc15.tree <- BuildClusterTree(pc15 , reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = c(1:12, 15))
+  DimPlot(pc15.tree, reduction = "umap", label = TRUE) + plot_annotation(title = 'umap for 1:12, 15 PCs')
+  PlotClusterTree(pc15.tree, label = TRUE) 
+  
+  clu<-DotPlot(pc15.tree,features=rev(genelist$ggene)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6)) + NoLegend() 
+  clu <- replaceLabelsX(clu,gene_master$ggene,gene_master$merge_desc)
+  clu <- clu + ggtitle('clustermarkers') # change each time
+  print(clu)
+  
+  pc16 <- RunUMAP(all2, dims = c(1:12, 15:16), verbose = FALSE)
+  pc16 <- FindNeighbors(pc16 , dims = c(1:12, 15:16), verbose = FALSE)
+  pc16 <- FindClusters(pc16 , verbose = FALSE)
+  pc16.tree <- BuildClusterTree(pc16 , reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = c(1:12, 15:16))
+  DimPlot(pc16.tree, reduction = "umap", label = TRUE) + plot_annotation(title = 'umap for 1:12, 15:16 PCs')
+  PlotClusterTree(pc16.tree, label = TRUE) 
+  
+  clus<-DotPlot(pc16.tree,features=rev(genelist$ggene)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6)) + NoLegend() 
+  clus <- replaceLabelsX(clus,gene_master$ggene,gene_master$merge_desc)
+  clus <- clus+ ggtitle('clustermarkers') # change each time
+  print(clus)
+  
+  pc18 <- RunUMAP(all2, dims = c(1:12, 15:16, 18), verbose = FALSE)
+  pc18 <- FindNeighbors(pc18 , dims = c(1:12, 15:16, 18), verbose = FALSE)
+  pc18 <- FindClusters(pc18 , verbose = FALSE)
+  pc18.tree <- BuildClusterTree(pc18 , reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = c(1:12, 15:16, 18))
+  DimPlot(pc18.tree, reduction = "umap", label = TRUE) + plot_annotation(title = 'umap for 1:12, 15:16, 18 PCs')
+  PlotClusterTree(pc18.tree, label = TRUE) 
+  
+  clust<-DotPlot(pc18.tree,features=rev(genelist$ggene)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6)) + NoLegend() 
+  clust <- replaceLabelsX(cluste,gene_master$ggene,gene_master$merge_desc)
+  clust <- clust+ ggtitle('clustermarkers') # change each time
+  print(clust)
+
+  pc19 <- RunUMAP(all2, dims = c(1:12, 15:16, 18:19), verbose = FALSE)
+  pc19 <- FindNeighbors(pc19 , dims = c(1:12, 15:16, 18:19), verbose = FALSE)
+  pc19 <- FindClusters(pc19 , verbose = FALSE)
+  pc19.tree <- BuildClusterTree(pc19 , reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = c(1:12, 15:16, 18:19))
+  DimPlot(pc19.tree, reduction = "umap", label = TRUE) + plot_annotation(title = 'umap for 1:12, 15:16, 18:19 PCs')
+  PlotClusterTree(pc19.tree, label = TRUE) 
+  
+  cluste<-DotPlot(pc19.tree,features=rev(genelist$ggene)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6)) + NoLegend() 
+  cluste <- replaceLabelsX(cluste,gene_master$ggene,gene_master$merge_desc)
+  cluste <- cluste+ ggtitle('clustermarkers') # change each time
+  print(cluste)
+  
+  dev.off() 
+  
+
+for (loop in 24:25){
+  
+  pc24_25 <- RunUMAP(all2, dims = 24:25, verbose = FALSE)
+  pc24_25 <- FindNeighbors(pc24 , dims = 24:25, verbose = FALSE)
+  pc24_25 <- FindClusters(pc24 , verbose = FALSE)
+  pc24_25.tree <- BuildClusterTree(pc24_25 , reorder = TRUE, reorder.numeric = TRUE, slot = "scale.data", verbose = TRUE, dims = 24:25)
+  DimPlot(pc24_25.tree, reduction = "umap", label = TRUE) + plot_annotation(title = paste('umap for', loop, 'PCs', sep=" "))
+  PlotClusterTree(pc24_25.tree, label = TRUE) 
+  
+  cluster<-DotPlot(pc24_25.tree,features=rev(genelist$ggene)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6)) + NoLegend() 
+  cluster <- replaceLabelsX(cluster,gene_master$ggene,gene_master$merge_desc)
+  cluster <- cluster+ ggtitle('clustermarkers') # change each time
+  print(cluster)}
+
+
+
+```
 
 
 
