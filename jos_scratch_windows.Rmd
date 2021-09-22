@@ -103,7 +103,7 @@ saveRDS(all, "/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_m
 #all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsmMitoAnnot_nfeat500__mito6_nCount1000-20000_nFeatmin600_081821_SctCCA_omitdims.rds")
 #all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_StdCCA_omitdims.rds")
 all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_SctCCA_omitdims.rds")
-all <- readRDS("/Users/josongco/Desktop/ABD/FinalSeqData/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_SctCCA_omitdims.rds")
+all <- readRDS("C:/Users/Hannah Bishop/Dropbox (University of Oregon)/Seurat/hifiasm-5cells/hifiAsm5Cells-MitoAnnot_minFeat500__mito6_nCount1000-20000_nFeatmin600_082321_SctCCA_omitdims.rds")
 ```
 
 
@@ -185,8 +185,8 @@ replaceLabelsY <- function(p,gene,desc){
 # relevant csv files:
 gsheet_file <- "https://docs.google.com/spreadsheets/d/1dio9May3vt6svMes9J-uSCZM9q4b-uEu1p3o9eqcttM/edit?usp=sharing" #GeneID google spreadsheet
 gene_master <- read_sheet(gsheet_file,range = "gg_table") # gene_master doc
-noID <- read_sheet(gsheet_file,range = "noID ggene")
-top30 <- read_sheet(gsheet_file,range = "top30")
+noID <- read_sheet(gsheet_file,range = "MorenoIDggenes")
+top30 <- read_sheet(gsheet_file,range = "top30") # error: exceeds grid limits
 genesofint <- read_sheet(gsheet_file,range = "cluster markers")
 ```
 
@@ -202,8 +202,8 @@ all <- RunPCA(all, verbose = FALSE)
 #all.genes <- rownames(all@assays$SCT) #sctransform
 #all.genes <- rownames(all@assays$RNA) #RNA 
 #gene_master<- read.csv("/Users/josongco/Desktop/GeneIDs - GGene Temp Master.csv", stringsAsFactors = FALSE) #temp master
-gene_master<- read.csv("/Users/josongco/Desktop/ABD/FinalSeqData/genelists_091221/merged_ggenes.csv", stringsAsFactors = FALSE) #updated 090321 in google drive #merged_ggenes
-noID <- read.csv("/Users/josongco/Desktop/ABD/FinalSeqData/genelists_091221/GeneIDs - noID ggene.csv")
+#gene_master<- read.csv("/Users/josongco/Desktop/ABD/FinalSeqData/genelists_091221/merged_ggenes.csv", stringsAsFactors = FALSE) #updated 090321 in google drive #merged_ggenes
+#noID <- read.csv("/Users/josongco/Desktop/ABD/FinalSeqData/genelists_091221/GeneIDs - noID ggene.csv")
 
 pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/sct_heatmap.pdf",
     width = 8, # The width of the plot in inches
@@ -342,22 +342,29 @@ dev.off()
 
 ```{r, echo = FALSE, eval = TRUE}
 #### NEEDS TO BE UPDATED
+DefaultAssay(all.tree) <- "SCT"
+
 pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091321names/sct_top30clustersInclNoIDdot.pdf",
+    width = 8, # The width of the plot in inches
+    height = 8)
+
+
+pdf(file = "C:/Users/Hannah Bishop/Desktop/sct_top30_inclNoIDdot.pdf",
     width = 8, # The width of the plot in inches
     height = 8)
 for (m in 1:(nlevels((all.tree$seurat_clusters)) - 1)){ #(nlevels((all.tree$seurat_clusters)) - 1)
   clustermarkers_i <- FindMarkers(all.tree, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
   clustermarkers_i$diff_exp <- (clustermarkers_i$pct.1/clustermarkers_i$pct.2)
-  clustermarkers_i <- setNames(cbind(rownames(clustermarkers_i), clustermarkers_i, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "pct.1", "pct.2", "diff_exp")) 
+ clustermarkers_i <- setNames(cbind(rownames(clustermarkers_i), clustermarkers_i, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "avg_log2FC", "pct.1", "pct.2", "diff_exp")) #windows uses avg_log2FC but mac doesn't
   clustermarkers_i %>%
     top_n(n = 30, wt = diff_exp) ->top30
-   top30<-addGeneNamesTable(top30,top30$geneID,gene_master$ggenes, gene_master$merge_desc)
-     clusterName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/", "cluster", m, "_top30", ".csv", sep = "")
-  write.csv(top30, clusterName)
+   top30<-addGeneNamesTable(top30,top30$geneID,gene_master$ggene, gene_master$merge_desc)
+     #clusterName = paste("/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091221names/", "cluster", m, "_top30", ".csv", sep = "")
+  #write.csv(top30, clusterName)
    
    print(top30)
-  p<-DotPlot(all.tree@assays[["SCT"]],features=top30$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + NoLegend()
-  p<-replaceLabelsX(p,gene_master$ggenes,gene_master$merge_desc)
+  p<-DotPlot(all.tree,features=top30$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + NoLegend() 
+  p<-replaceLabelsX(p,gene_master$ggene,gene_master$merge_desc)
   p <- p+ ggtitle(paste('top30 for cluster', m, sep = " ")) 
   print(p)  
 }
@@ -553,16 +560,16 @@ dev.off()
 ## cluster markers
 genelist <- genesofint$ggene
 #use<- data_frame(intersect(genelist,unique(cluster.markers$gene))) # overlap between genelist and markers
-genelist <- addGeneNamesTable(genesofint,genesofint$ggene,gene_master$ggenes, gene_master$merge_desc)
+genelist <- addGeneNamesTable(genesofint,genesofint$ggene,gene_master$ggene, gene_master$merge_desc)
 
 
 pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091321names/sct_yfg-clustermarkers_updated091421_dot.pdf", #change each time
     width = 10, # The width of the plot in inches
     height = 8)
-p<-DotPlot(all.tree,features=rev(yfg$ggene)) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6)) + NoLegend() 
+p<-DotPlot(all.tree,features=genelist$ggene) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6)) + NoLegend() 
 # The following requested variables were not found: G4907, G15066, G1766
 # p<-DotPlot(all.tree,features=rev(all.genes[genelist])) + RotatedAxis()+ theme(axis.text.x = element_text(size = 6))
-p <- replaceLabelsX(p,gene_master$ggenes,gene_master$merge_desc)
+p <- replaceLabelsX(p,gene_master$ggene,gene_master$merge_desc)
 p <- p+ ggtitle('clustermarkers') # change each time
 print(p)
 dev.off()
@@ -572,8 +579,8 @@ pdf(file = "/Users/josongco/Desktop/ABD/FinalSeqData/hifiasm5cells_091321names/s
     width = 8, # The width of the plot in inches
     height = 5)
 for (i in 1:length(genelist)){
-  fp <- FeaturePlot(all.tree, features = yfg$ggene[i], ncol = 1) + NoAxes()
-  fp <- fp+ ggtitle(yfg$GeneName[i])
+  fp <- FeaturePlot(all.tree, features = genelist$ggene[i], ncol = 1) + NoAxes()
+  fp <- fp+ ggtitle(genelist$GeneName[i])
   print(fp)
 }
 dev.off()
