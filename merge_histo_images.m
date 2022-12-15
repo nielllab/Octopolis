@@ -1,9 +1,10 @@
+clear all
 %%% folder for each channel
-folders = {'DAPI','FMRFA-620','FMRFR-570','PROTPRQFV-520','PRQFV-690'};
+folders = {'Channel1-DAPI','Channel2-520','Channel3-570','Channel4-620','Channel5-690'};
 %%% base of name to store output files
 name_base = 'merge\';
 %%% amount to downsample to save memory
-downsample = 0.125;
+downsample = 1/16;
 
 %%% get list of filenames from first channel folder
 files = dir([folders{1} '\*.tif']);
@@ -25,7 +26,7 @@ nrows = min(rows);
 ncols = min(cols);
 
 %%% loop over all files
-for f = 10:14  %length(files);
+for f = 1:24 %length(files);
     fnames{f}
    tic
    for ch = 1:length(folders);
