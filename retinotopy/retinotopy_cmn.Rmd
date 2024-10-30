@@ -1,0 +1,210 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-10-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+```{r}
+library(Matrix)
+library(ggplot2)
+library(sctransform)
+library(stringr)
+library(cowplot) # used for CCA
+library(patchwork) # used for CCA
+library(dplyr) # used for print markers
+library(plotly) # used for 3D mapping of UMAP
+library(googlesheets4)
+library(tidyverse)
+library(here)
+library(Seurat)
+library(presto)
+library(scCustomize)
+```
+
+
+```{r}
+
+# function to add gene names to data table
+# assumes first column of table is G gene
+# uses master list with gene name in 1st column, G gene in 3rd column
+addGeneNamesTable<- function(data,geneID, gene, desc){ # a little redundant to send in geneID but this solves the problem that different objects name it differently
+  data$GeneName <- '' # create empty column
+  for (i in 1:nrow(data)){
+    #ggene = data$gene[[i]] #cluster markers
+    obgene = geneID[[i]] # individual cluster markers
+    #ggene = data$Feature[[i]] #dimheatmap
+    #ggene = data$feature[[i]] #viz dim loadings
+    loc <- which(gene ==obgene)
+    if (length(loc)>0) {  # if something is found
+      data$GeneName[[i]] <- desc[loc[1]] # if multiple found, use 1st one
+    }
+  }
+  
+  data
+}
+
+replaceLabelsX <- function(p,gene,desc){
+  pp<- ggplot_build(p)
+  oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x$breaks
+  newxlabels = oldxlabels
+  for (i in 1:length(oldxlabels)){
+    loc<-which(gene==(oldxlabels[[i]]))
+    if (length(loc)>0){
+      newxlabels[[i]] = paste(oldxlabels[[i]], "-", desc[[loc[1]]])
+      newxlabels[[i]] = substr(newxlabels[[i]],1,100)}}
+  p<- p + scale_x_discrete(labels = newxlabels)
+}
+
+replaceLabelsY <- function(p,gene,desc){
+  pp<- ggplot_build(p)
+  oldylabels = ggplot_build(p)$layout$panel_params[[1]]$y$breaks
+  newylabels = oldylabels
+  for (i in 1:length(oldylabels)){
+    loc<-which(gene==(oldylabels[[i]]))
+    if (length(loc)> 0) {
+      newylabels[[i]] = paste(oldylabels[[i]], "-", desc[[loc[1]]])
+      newylabels[[i]] = substr(newylabels[[i]],1,100)}}
+  p<- p + scale_y_discrete(labels = newylabels)
+}
+
+shorten <- function(x)
+{
+  stringr::str_trunc(x, 50)
+}
+
+```
+
+```{r}
+#read Seurat object (after clustering)
+
+obj <-readRDS("~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/filtered_SCTransform_clustered_topos.RDS")
+
+#obj <-readRDS("~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/no_MT_filtered_SCTransform_clustered_topos.RDS")
+```
+
+
+```{r}
+# read gene names
+gene_master <- read_csv("~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/GeneIDs.csv")
+gene_master <- gene_master %>% mutate(short_merge = shorten(merge_desc))
+```
+
+```{r}
+obj<-PrepSCTFindMarkers(obj)
+```
+
+```{r}
+# create identies based on boolean combination of properties
+
+# this string contains the values you want (e.g. bottom_5 for bottom sample, cluster 5)
+obj$celltype.sample <- paste(obj$sample,obj$seurat_clusters,sep="_")
+# this sets identities to the strings
+Idents(obj)<-"celltype.sample"
+# find markers based on values you want by selecting appropriate identity strings
+markers<-FindMarkers(obj, ident.1 = "bottom_0", ident.2 = "top_0", verbose = FALSE)
+head(markers,n=10)
+
+```
+```{r}
+# loop over all clusters and find markers separating top and bottom
+# need to have set up sample + celltype idents above
+rm(allMarkers)
+rm(ids)
+
+obj$celltype.sample <- paste(obj$sample,obj$seurat_clusters,sep="_")
+# this sets identities to the strings
+Idents(obj)<-"celltype.sample"
+
+for (i in 0:length(unique(obj$seurat_clusters))){
+#for (i in 0:0){
+  # create strings for top and bottom cluster based on loop index
+  g1<-paste("left",i,sep="_")
+  g2<- paste("right",i,sep="_")
+  # check to see if there's enough cells in this cluster+sample!
+  if (sum(obj$celltype.sample==g1)>100 & sum(obj$celltype.sample==g2)>100 ){
+    # find markers
+    markers<-FindMarkers(obj, ident.1 = g1, ident.2 =g2, verbose = TRUE)
+    # relabel with gene names
+    markerNames<-addGeneNamesTable(markers,row.names(markers),gene_master$obgene,gene_master$merge_desc)
+    #print top of list
+    print(head(markerNames,n=10))
+    # keep markers that meet criteria (min p-value, fold-change, exp level)
+    newvals<-markerNames[markerNames$p_val_adj<0.01 & (markerNames$pct.1 >0.25 | markerNames$pct.2 >0.25) & abs(markerNames$avg_log2FC)>2,]
+    if (exists('allMarkers')){
+      allMarkers<-rbind(allMarkers,newvals)
+      ids<-c(ids,g1,g2)
+    } else{
+      allMarkers<-newvals
+      ids<-c(g1,g2)
+    }
+  }
+  
+}
+```
+
+
+```{r}
+Idents(obj)<-"sample"
+p<-DotPlot(obj,idents = c('right','left'),features = row.names(head(allMarkers,n=100))) + RotatedAxis() + theme(text = element_text(size = 1)) +NoLegend()
+p<-replaceLabelsX(p,gene_master$obgene,gene_master$short_merge)
+p
+
+```
+
+```{r}
+Idents(obj)<-"sample"
+p<-DotPlot(obj,features = row.names(head(allMarkers,n=100))) + RotatedAxis() + theme(text = element_text(size = 20)) +NoLegend()
+p<-replaceLabelsX(p,gene_master$obgene,gene_master$short_merge)
+p
+
+```
+
+
+```{r}
+Idents(obj)<-"celltype.sample"
+p<-DotPlot(obj,idents = ids,features = row.names(head(allMarkers,n=100))) + RotatedAxis() + theme(text = element_text(size = 20))
+p<-replaceLabelsX(p,gene_master$obgene,gene_master$short_merge)
+p
+
+```
+```{r}
+Idents(obj)<-"celltype.sample"
+p<-DotPlot_scCustom(obj,idents = ids,features = row.names(head(allMarkers,n=100)), x_lab_rotate=TRUE) + theme(text = element_text(size = 20)) +NoLegend()
+p<-replaceLabelsX(p,gene_master$obgene,gene_master$short_merge)
+p
+```
+
+```{r}
+Idents(obj)<-"sample"
+p<-DotPlot_scCustom(obj, idents = c('left','right'), split.by = 'seurat_clusters',cols = "Blues", features = row.names(head(allMarkers,n=100))) + RotatedAxis() + theme(axis.text.x = element_text(size = 8))+ theme(axis.text.y = element_text(size = 8)) +NoLegend()
+p<-replaceLabelsX(p,gene_master$obgene,gene_master$short_merge)
+p
+
+```
+
+```{r}
+Idents(obj)<-"sample"
+leftright = subset(obj, idents = c('left','right'))
+```
+
+
+```{r}
+markers = row.names(head(allMarkers,n=100))
+for (i in 1:length(markers)){
+  p<-FeaturePlot(leftright, features = markers[i], split.by = "sample")
+  print(p)
+}
+
+```
+
