@@ -1,0 +1,598 @@
+---
+title: "TopoMapp_ObimacVS_Analysis"
+author: "JO Songco-Casey"
+date: "2024-08-19"
+output: html_document
+---
+
+Mount to talapas to access raw cellranger files:
+sshfs jsongco@login.talapas.uoregon.edu:/projects/niell/shared/Octopus /Users/josongco/Octopus
+
+```{r}
+# set working directory in console
+setwd("/Users/josongco/Octopus") # when reading in talapas files
+setwd('/Users/josongco/Desktop/topographicalMapping') # when saving files locally
+```
+
+Begin 'Integrative analysis in Seurat v5' Vignette
+https://satijalab.org/seurat/articles/seurat5_integration
+
+```{r}
+library(Seurat)
+library(SeuratData)
+library(SeuratWrappers)
+library(Azimuth)
+library(ggplot2)
+library(patchwork)
+```
+
+```{r}
+# read in files
+directoryMaster = "/Users/josongco/Desktop/topographicalMapping/directoryMaster.csv"
+datafiles <- read.csv(directoryMaster, stringsAsFactors = FALSE)
+data_dir <- as.vector(datafiles$Directory)
+
+#make empty list for all the seurat objects
+all_list = list()
+
+ct = 1
+
+for(f in 1:4){
+  all <- Read10X(data.dir = (data_dir[f]))
+  all <- CreateSeuratObject(counts = all, project = paste("Sample", f, sep = ""), min.cells = 3, min.features = 500)
+all_list[[ct]] = all
+  ct = ct + 1
+}
+
+saveRDS(all_list, "/Users/josongco/Desktop/topographicalMapping/datasets/completeLRTB.rds") #change depending on dataset
+```
+
+```{r}
+# identify mitochondrial genes - included in genome without "obimac" identifier
+
+for (i in 1:length(all_list)){
+  all_list[[i]][["percent.mt"]] <- PercentageFeatureSet(all_list[[i]], pattern = "^[^obimac]")
+}
+
+# visualize reads per cell
+Thres_nCount_1 <- VlnPlot(all_list[[1]], features = "nCount_RNA", y.max = 20000, pt.size = 0, cols = "lightcoral")
+Thres_nCount_2 <- VlnPlot(all_list[[2]], features = "nCount_RNA", y.max = 20000,pt.size = 0, cols = "steelblue") 
+Thres_nCount_3 <- VlnPlot(all_list[[3]], features = "nCount_RNA", y.max = 20000,pt.size = 0, cols = "lightgreen")
+Thres_nCount_4 <- VlnPlot(all_list[[4]], features = "nCount_RNA", y.max = 20000,pt.size = 0, cols = "yellow") 
+wrap_plots(Thres_nCount_1, Thres_nCount_2, Thres_nCount_3, Thres_nCount_4)
+Thres_nCount_1 + Thres_nCount_2 + Thres_nCount_3 + Thres_nCount_4
+
+Thres_nCount_1 <- VlnPlot(all_list[[1]], features = "nCount_RNA", y.max = 10000, pt.size = 0, cols = "lightcoral")
+Thres_nCount_2 <- VlnPlot(all_list[[2]], features = "nCount_RNA", y.max = 10000,pt.size = 0, cols = "steelblue") 
+Thres_nCount_3 <- VlnPlot(all_list[[3]], features = "nCount_RNA", y.max = 10000,pt.size = 0, cols = "lightgreen")
+Thres_nCount_4 <- VlnPlot(all_list[[4]], features = "nCount_RNA", y.max = 10000,pt.size = 0, cols = "yellow") 
+wrap_plots(Thres_nCount_1, Thres_nCount_2, Thres_nCount_3, Thres_nCount_4)
+
+Thres_nCount_1 <- VlnPlot(all_list[[1]], features = "nCount_RNA", y.max = 2500, pt.size = 0, cols = "lightcoral")
+Thres_nCount_2 <- VlnPlot(all_list[[2]], features = "nCount_RNA", y.max = 2500,pt.size = 0, cols = "steelblue") 
+Thres_nCount_3 <- VlnPlot(all_list[[3]], features = "nCount_RNA", y.max = 2500,pt.size = 0, cols = "lightgreen")
+Thres_nCount_4 <- VlnPlot(all_list[[4]], features = "nCount_RNA", y.max = 2500,pt.size = 0, cols = "yellow") 
+wrap_plots(Thres_nCount_1, Thres_nCount_2, Thres_nCount_3, Thres_nCount_4)
+
+# visualize genes per cell
+Thres_nFeat_1 <- VlnPlot(all_list[[1]], features = "nFeature_RNA", y.max = 5000,pt.size = 0, cols = "lightcoral") 
+Thres_nFeat_2 <- VlnPlot(all_list[[2]], features = "nFeature_RNA", y.max = 5000,pt.size = 0, cols = "steelblue") 
+Thres_nFeat_3 <- VlnPlot(all_list[[3]], features = "nFeature_RNA", y.max = 5000,pt.size = 0, cols = "lightgreen") 
+Thres_nFeat_4 <- VlnPlot(all_list[[4]], features = "nFeature_RNA", y.max = 5000,pt.size = 0, cols = "yellow") 
+wrap_plots(Thres_nFeat_1, Thres_nFeat_2, Thres_nFeat_3, Thres_nFeat_4)
+Thres_nFeat_1+ Thres_nFeat_2+ Thres_nFeat_3+ Thres_nFeat_4
+
+Thres_nFeat_1 <- VlnPlot(all_list[[1]], features = "nFeature_RNA", y.max = 1000,pt.size = 0, cols = "lightcoral") 
+Thres_nFeat_2 <- VlnPlot(all_list[[2]], features = "nFeature_RNA", y.max = 1000,pt.size = 0, cols = "steelblue") 
+Thres_nFeat_3 <- VlnPlot(all_list[[3]], features = "nFeature_RNA", y.max = 1000,pt.size = 0, cols = "lightgreen") 
+Thres_nFeat_4 <- VlnPlot(all_list[[4]], features = "nFeature_RNA", y.max = 1000,pt.size = 0, cols = "yellow") 
+wrap_plots(Thres_nFeat_1, Thres_nFeat_2, Thres_nFeat_3, Thres_nFeat_4)
+Thres_nFeat_1+ Thres_nFeat_2+ Thres_nFeat_3+ Thres_nFeat_4
+
+# visualize mitochondrial percentage per cell
+Thres_MT_1 <- VlnPlot(all_list[[1]], features = "percent.mt", y.max = 20,pt.size = 0, cols = "lightcoral") 
+Thres_MT_2 <- VlnPlot(all_list[[2]], features = "percent.mt",y.max = 20,pt.size = 0, cols = "steelblue") 
+Thres_MT_3 <- VlnPlot(all_list[[3]], features = "percent.mt", y.max = 20,pt.size = 0, cols = "lightgreen") 
+Thres_MT_4 <- VlnPlot(all_list[[4]], features = "percent.mt", y.max = 20,pt.size = 0, cols = "yellow") 
+wrap_plots(Thres_MT_1 , Thres_MT_2, Thres_MT_3, Thres_MT_4)
+Thres_MT_1+ Thres_MT_2+ Thres_MT_3+ Thres_MT_4
+
+# set thresholds
+for (i in 1:length(all_list)){
+all_list[[i]] <- subset(all_list[[i]], subset = percent.mt < 6 & nCount_RNA > 1000 & nCount_RNA < 10000 & nFeature_RNA > 500)
+}
+```
+
+
+Integrate datasets
+```{r}
+all.list <- readRDS("/Users/josongco/Desktop/topographicalMapping/datasets/completeLRTB.rds")
+#all.list = all_list
+all.list <- lapply(X = all.list[3:4], FUN = function(x) {
+    x <- NormalizeData(x)
+    x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 2000)
+})
+features <- SelectIntegrationFeatures(object.list = all.list)
+all.anchors <- FindIntegrationAnchors(object.list = all.list, anchor.features = features)
+all.combined <- IntegrateData(anchorset = all.anchors)
+
+saveRDS(all.combined, "/Users/josongco/Desktop/topographicalMapping/datasets/combinedLRTB.rds")
+saveRDS(all.combined, "/Users/josongco/Desktop/topographicalMapping/datasets/combinedLR.rds")
+saveRDS(all.combined, "/Users/josongco/Desktop/topographicalMapping/datasets/combinedTB.rds")
+
+all.list <- lapply(X = all.list, FUN = SCTransform) 
+features <- SelectIntegrationFeatures(object.list = all.list, nfeatures = 3000)
+
+all.list <- PrepSCTIntegration(
+  all.list,
+  assay = "RNA",
+  anchor.features = 3000,
+  sct.clip.range = NULL,
+  verbose = TRUE
+)
+
+all.list <- PrepSCTIntegration(object.list = all.list, anchor.features = features)
+
+all.anchors <- FindIntegrationAnchors(object.list = all.list, anchor.features = features, normalization.method = "SCT", verbose = TRUE) 
+allnorm.integrated <- IntegrateData(anchorset = all.anchors, normalization.method = "SCT", verbose = TRUE)
+
+all.list <- SCTransform(all.list, vars.to.regress = "percent.mt", verbose = FALSE)
+
+
+# these steps were performed using an earlier version of R and may require additional steps with later versions
+ all_list <- lapply(X = all_list, FUN = SCTransform) 
+ features <- SelectIntegrationFeatures(object.list = all_list, nfeatures = 3000)
+ all_list <- PrepSCTIntegration(object.list = all_list, anchor.features = features)
+
+all.anchors <- FindIntegrationAnchors(object.list = all_list, anchor.features = features, normalization.method = "SCT", verbose = TRUE) 
+allnorm.integrated <- IntegrateData(anchorset = all.anchors, normalization.method = "SCT", verbose = TRUE)
+
+# we recommend saving out the seurat object at this step in case R crashes  
+saveRDS(allnorm.integrated, "/userpath/ObimacSeq_SCTCCAint.rds")
+```
+
+```{r}
+saveRDS(all.combined, "/Users/josongco/Desktop/topographicalMapping/datasets/all.combined-std.rds")
+
+all.combined <- readRDS("/Users/josongco/Desktop/topographicalMapping/datasets/all.combined-std.rds")
+all.combined <- readRDS("/Users/josongco/Desktop/topographicalMapping/datasets/combinedLR.rds")
+all.combined.sct <- readRDS("/Users/josongco/Desktop/topographicalMapping/datasets/completeLR-IntegratedSct.rds")
+
+DefaultAssay(all.combined.sct) <- "integrated"
+
+# Run the standard workflow for visualization and clustering
+all.combined <- ScaleData(all.combined, verbose = FALSE) # omit from sct datasets
+all.combined <- RunPCA(all.combined.sct, npcs = 30, verbose = FALSE)
+
+ElbowPlot(all.combined)
+
+all.combined <- RunUMAP(all.combined, reduction = "pca", dims = 1:15)
+all.combined <- FindNeighbors(all.combined, reduction = "pca", dims = 1:15)
+all.combined <- FindClusters(all.combined, resolution = 0.5)
+
+
+saveRDS(all.combined, "/Users/josongco/Desktop/topographicalMapping/datasets/umapLRTB.rds")
+saveRDS(all.combined, "/Users/josongco/Desktop/topographicalMapping/datasets/umapTB.sct15d.rds")
+saveRDS(all.combined, "/Users/josongco/Desktop/topographicalMapping/datasets/umapLR.sct15d.rds")
+saveRDS(all.combined, "/Users/josongco/Desktop/topographicalMapping/datasets/umapLR.rds")
+
+p1 <- DimPlot(all.combined, reduction = "umap", group.by = "orig.ident")
+p2 <- DimPlot(all.combined, reduction = "umap", label = TRUE, repel = TRUE)
+p1 + p2
+
+DimPlot(all.combined, reduction = "umap", split.by = "orig.ident", label = TRUE)
+```
+
+```{r}
+#plotting genes on featureplots
+
+all.combinedLR <- readRDS("/Users/josongco/Desktop/topographicalMapping/datasets/umapLR.sct15d.rds")
+all.combinedTB <- readRDS("/Users/josongco/Desktop/topographicalMapping/datasets/umapTB.sct15d.rds")
+
+
+pdf(file = "/Users/josongco/Desktop/topographicalMapping/latro-ten.pdf",
+    width = 8, # The width of the plot in inches
+    height = 8)
+p1 <- DimPlot(all.combinedLR, label = TRUE) + ggtitle('left v right')
+p2 <- DimPlot(all.combinedLR, group.by = "orig.ident")
+
+DefaultAssay(all.combinedLR) <- "SCT"
+
+fp1 <- FeaturePlot(all.combinedLR, features='obimac0021926')
+fp2 <- FeaturePlot(all.combinedLR, features='obimac0020133')
+
+
+p3 <- DimPlot(all.combinedTB, label = TRUE) + ggtitle('top v bottom')
+p4 <- DimPlot(all.combinedTB, group.by = "orig.ident")
+
+DefaultAssay(all.combinedTB) <- "SCT"
+
+fp3 <- FeaturePlot(all.combinedTB, features='obimac0021926')
+fp4 <- FeaturePlot(all.combinedTB, features='obimac0020133')
+
+
+
+print(p1)
+print(p2) 
+print(fp1) 
+print(fp2)
+
+
+print(p3) 
+print(p4) 
+print(fp3)
+print(fp4)
+
+
+dev.off()
+
+
+pdf(file = "/Users/josongco/Desktop/topographicalMapping/latro-ten.dp.pdf",
+    width = 8, # The width of the plot in inches
+    height = 4)
+
+DefaultAssay(all.combinedLR) <- 'integrated'
+
+DotPlot(all.combinedLR, features = c('obimac0021926','obimac0020133'), cols = c("blue", "red"), split.by = "orig.ident") + RotatedAxis() + coord_flip() + theme(axis.text.x = element_text(size = 6)) + theme(axis.text.y = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + ggtitle('left v right, integrated assay')
+
+DefaultAssay(all.combinedLR) <- 'SCT'
+
+DotPlot(all.combinedLR, features = c('obimac0021926','obimac0020133'), cols = c("blue", "red"), split.by = "orig.ident") + RotatedAxis() + coord_flip() + theme(axis.text.x = element_text(size = 6)) + theme(axis.text.y = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + ggtitle('left v right, sct assay')
+
+DefaultAssay(all.combinedTB) <- 'integrated'
+
+DotPlot(all.combinedTB, features = c('obimac0021926','obimac0020133'), cols = c("blue", "red"), split.by = "orig.ident") + RotatedAxis() + coord_flip() + theme(axis.text.x = element_text(size = 6)) + theme(axis.text.y = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + ggtitle('top v bottom, integrated assay')
+
+DefaultAssay(all.combinedTB) <- 'SCT'
+
+DotPlot(all.combinedTB, features = c('obimac0021926','obimac0020133'), cols = c("blue", "red"), split.by = "orig.ident") + RotatedAxis() + coord_flip() + theme(axis.text.x = element_text(size = 6)) + theme(axis.text.y = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + ggtitle('top v bottom, sct assay')
+
+
+
+dev.off()
+
+all.combined <- readRDS("/Users/josongco/Desktop/topographicalMapping/datasets/umapLRTB.rds")
+DefaultAssay(all.combined) <- "RNA"
+FeaturePlot(all.combined, features = c('obimac0021926','obimac0020133'), split.by = "orig.ident")
+
+```
+
+
+Identify conserved cell type markers
+```{r}
+DefaultAssay(all.combined) <- "RNA"
+all.combined <- JoinLayers(all.combined)
+conserved.markers.1 <- FindConservedMarkers(all.combined, ident.1 = 1, grouping.var = "orig.ident", verbose = FALSE)
+head(conserved.markers)
+
+FeaturePlot(all.combined, features = c("G15407", "G13308", "G12130", "G14919", "G21142", "G14903"), min.cutoff = "q9", split.by = "orig.ident")
+#immune.combined <- RenameIdents(immune.combined, `0` = "CD14 Mono", `1` = "CD4 Naive T", `2` = "CD4 Memory T", `3` = "CD16 Mono", `4` = "B", `5` = "CD8 T", `6` = "NK", `7` = "T activated", `8` = "DC", `9` = "B Activated", `10` = "Mk", `11` = "pDC", `12` = "Eryth", `13` = "Mono/Mk Doublets", `14` = "HSPC")
+#DimPlot(immune.combined, label = TRUE)
+
+#Idents(all.combined) <- "seurat_clusters"
+DotPlot(all.combined, features = c("G15407", "G13308", "G12130", "G14919", "G21142", "G14903"), cols = c("blue", "red"), dot.scale = 8, split.by = "orig.ident") + RotatedAxis()
+```
+
+## set up functions for labels
+```{r echo = FALSE, eval = TRUE}
+# function to add gene names to data table
+# assumes first column of table is G gene
+# uses master list with gene name in 1st column, G gene in 3rd column
+addGeneNamesTable<- function(data,geneID, gene, desc){ # a little redundant to send in geneID but this solves the problem that different objects name it differently
+  data$GeneName <- '' # create empty column
+  for (i in 1:nrow(data)){
+    #ggene = data$gene[[i]] #cluster markers
+    obgene = geneID[[i]] # individual cluster markers
+    #ggene = data$Feature[[i]] #dimheatmap
+    #ggene = data$feature[[i]] #viz dim loadings
+    loc <- which(gene ==obgene)
+    if (length(loc)>0) {  # if something is found
+      data$GeneName[[i]] <- desc[loc[1]] # if multiple found, use 1st one
+    }
+  }
+
+  data
+}
+#
+#replaceLabelsX <- function(p,gene,desc){
+#  pp<- ggplot_build(p)
+#  oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x$breaks
+#  newxlabels = oldxlabels
+#  for (i in 1:length(oldxlabels)){
+#    loc<-which(gene==(oldxlabels[[i]]))
+#    if (length(loc)>0){
+#      newxlabels[[i]] = paste(oldxlabels[[i]], "-", desc[[loc[1]]])
+#      newxlabels[[i]] = substr(newxlabels[[i]],1,50)}
+#    else {
+#      for (j in 1:length(newxlabels)){
+#        inds<-which(noID$ggene==(newxlabels[[j]]))
+#        if (length(inds)>0){
+#          newxlabels[[j]] = paste(newxlabels[[j]], "-", #noID$Manual_NCBI_BLAST_ID[[inds[1]]])
+#        }
+#        newxlabels[[j]] = substr(newxlabels[[j]],1,50)
+#}}}
+#  p<- p + scale_x_discrete(labels = newxlabels)
+#}
+
+# does not use noID list
+replaceLabelsX <- function(p,gene,desc){
+  pp<- ggplot_build(p)
+  oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x$breaks
+  newxlabels = oldxlabels
+  for (i in 1:length(oldxlabels)){
+    loc<-which(gene==(oldxlabels[[i]]))
+    if (length(loc)>0){
+      newxlabels[[i]] = paste(oldxlabels[[i]], "-", desc[[loc[1]]])
+      newxlabels[[i]] = substr(newxlabels[[i]],1,50)}}
+  p<- p + scale_x_discrete(labels = newxlabels)
+}
+
+replaceLabelsY <- function(p,gene,desc){
+  pp<- ggplot_build(p)
+  oldylabels = ggplot_build(p)$layout$panel_params[[1]]$y$breaks
+  newylabels = oldylabels
+  for (i in 1:length(oldylabels)){
+    loc<-which(gene==(oldylabels[[i]])) # i/ind 4 = 919, G34789, NPcorrendocrine protein/ label = paste(genelabels[919], "-", namelist[919])
+    if (length(loc)> 0) {
+      #loc<-which(oldylabels %in% genelabels)
+      newylabels[[i]] = paste(oldylabels[[i]], "-", desc[[loc[1]]])
+      newylabels[[i]] = substr(newylabels[[i]],1,50)}
+    else {
+      for (j in 1:length(newylabels)){
+        inds<-which(noID$ggene==(newylabels[[j]]))
+        if (length(inds)>0){
+          newylabels[[j]] = paste(newylabels[[j]], "-", noID$Manual_NCBI_BLAST_ID[[inds[1]]])
+        }
+        newylabels[[j]] = substr(newylabels[[j]],1,50)
+      }}}
+  p<- p + scale_y_discrete(labels = newylabels)
+}
+
+
+wrapper <- function(x, ...) 
+{
+  paste(strwrap(x, ...), collapse = "\n")
+}
+
+shorten <- function(x)
+{
+  stringr::str_trunc(x, 100)
+}
+
+gene_master <- read.csv("/Users/josongco/Desktop/Cell Types Seurat Code & Files/GeneIDs.csv")
+```
+
+Identifying differentially expressed genes across conditions
+```{r}
+library(ggplot2)
+library(cowplot)
+theme_set(theme_cowplot())
+
+all.combined <- readRDS("/Users/josongco/Desktop/topographicalMapping/datasets/umapTB.sct15d.rds")
+all.combined <- readRDS("/Users/josongco/Desktop/topographicalMapping/datasets/umapLR.rds")
+all.combined <- readRDS("/Users/josongco/Desktop/topographicalMapping/datasets/umapTB.rds")
+
+cells1 <- subset(all.combined, idents = 1)
+Idents(cells1) <- "orig.ident"
+avg.cells1 <- as.data.frame(log1p(AverageExpression(cells1, verbose = FALSE)$SCT)) #$RNA
+avg.cells1$gene <- rownames(avg.cells1)
+avg.cells1 <- addGeneNamesTable(avg.cells1, avg.cells1$gene, avg.cells1$gene, gene_master$merge_desc)
+
+cells2 <- subset(all.combined, idents = 2)
+Idents(cells2) <- "orig.ident"
+avg.cells2 <- as.data.frame(log1p(AverageExpression(cells2, verbose = FALSE)$SCT))
+avg.cells2$gene <- rownames(avg.cells2)
+avg.cells2 <- addGeneNamesTable(avg.cells2, avg.cells2$gene, avg.cells2$gene, gene_master$merge_desc)
+
+
+
+genes.to.label = c("obimac0020958", "obimac0014441", "obimac0021555", "obimac0012076", "obimac0030402", "obimac0013580", "obimac0002637", "obimac0021237", "obimac0007601", "obimac0030399", "obimac0020553", "obimac0019980")
+p1 <- ggplot(avg.cells1, aes(Sample1, Sample2)) + geom_point() + ggtitle("example cells idents 1")
+p1 <- LabelPoints(plot = p1, points = genes.to.label, repel = TRUE)
+p2 <- ggplot(avg.cells2, aes(Sample1, Sample2)) + geom_point() + ggtitle("example cells idents 2")
+p2 <- LabelPoints(plot = p2, points = genes.to.label, repel = TRUE)
+p1 + p2
+
+allcombined.celltypesample <- all.combined
+allcombined.celltypesample$celltype.sample <- paste(Idents(allcombined.celltypesample), allcombined.celltypesample$orig.ident, sep = "_")
+allcombined.celltypesample$celltype <- Idents(allcombined.celltypesample)
+Idents(allcombined.celltypesample) <- "celltype.sample"
+
+DefaultAssay(all.combined) <- "integrated"
+#example.combined <- JoinLayers(all.combined)
+all.combined <- PrepSCTFindMarkers(all.combined)
+exTB.markers <- FindConservedMarkers(all.combined, ident.1 = 5, assay = "SCT", grouping.var = "orig.ident", verbose = FALSE)
+exTB.markers$gene <- rownames(exTB.markers)
+exTB.markers <- addGeneNamesTable(exTB.markers, exTB.markers$gene, exTB.markers$gene, gene_master$merge_desc)
+
+
+example.response <- FindMarkers(allcombined.celltypesample, ident.1 = "0_Sample3", ident.2 = "0_Sample4", verbose = FALSE)
+head(example.response, n = 15)
+example.response <- rownames(example.response)
+example.response <- data.frame(example.response)
+example.response$gene <- example.response$example.response
+example.response <- addGeneNamesTable(example.response, example.response$gene, example.response$gene, gene_master$merge_desc)
+top30_btwn <- head(example.response, n = 30)
+
+
+
+
+
+
+genes.to.label <- read.csv("/Users/josongco/Desktop/topographicalMapping/mainGenes.csv")
+genes.to.label <- addGeneNamesTable(genes.to.label, genes.to.label$obgene, gene_master$obgene, gene_master$merge_desc)
+#DefaultAssay(all.combined) <- "RNA" # use for standard normalization
+ 
+DefaultAssay(all.combined) <- "SCT" # use for sct normalization
+
+pdf(file = "/Users/josongco/Desktop/topographicalMapping/LRmainGenesplots-sct15d.pdf",
+    width = 8, # The width of the plot in inches
+    height = 8)
+  p1 <- DimPlot(all.combined, reduction = "umap", group.by = "orig.ident")
+p2 <- DimPlot(all.combined, reduction = "umap", label = TRUE, repel = TRUE)
+print(p2)
+print(p1)
+for (features in 1:11){ #without no gene desc 
+  fp <- FeaturePlot(all.combined, features = genes.to.label$obgene[features])
+  fp <- fp + ggtitle(genes.to.label$obgene[features], subtitle = paste(genes.to.label$gene[features]))
+  print(fp)
+}
+
+dots <- DotPlot(all.combined, features = genes.to.label$obgene)  + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(axis.text.y = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7))
+dots<-replaceLabelsX(dots,genes.to.label$obgene,genes.to.label$gene)
+dots <- dots 
+print(dots)
+dev.off()
+
+pdf(file = "/Users/josongco/Desktop/topographicalMapping/TBsct.conserved5.pdf",
+    width = 8, # The width of the plot in inches
+    height = 8)
+DefaultAssay(all.combined) <- "SCT"
+  p1 <- DimPlot(all.combined, reduction = "umap", group.by = "orig.ident")
+p2 <- DimPlot(all.combined, reduction = "umap", label = TRUE, repel = TRUE)
+print(p2)
+print(p1)
+for (features in 1:20){ #without no gene desc 
+  fp <- FeaturePlot(all.combined, features = exTB.markers$gene[features])
+  fp <- fp + ggtitle(exTB.markers$gene[features], subtitle = paste(exTB.markers$GeneName[features]))
+  print(fp)
+}
+
+dots <- DotPlot(all.combined, features = exTB.markers$gene[1:20], cols = c("blue","red"), split.by = "orig.ident")  + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(axis.text.y = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7))
+dots<-replaceLabelsX(dots,exTB.markers$gene,exTB.markers$GeneName)
+dots <- dots 
+print(dots)
+dev.off()
+
+
+FeaturePlot(all.combined, features = genes.to.label, split.by = "orig.ident", max.cutoff = 3, cols = c("grey", "red"))
+VlnPlot(all.combined, features = c("G15407", "G13308", "G12130", "G14919"), split.by = "orig.ident", cols = c("grey", "red"), ncol = 4)
+VlnPlot(all.combined, features = c("G15407", "G13308"), split.by = "orig.ident", cols = c("grey", "red"))
+
+plots <- VlnPlot(all.combined, features = c("G15407", "G13308", "G12130"), split.by = "orig.ident", group.by = "celltype",
+    pt.size = 0, combine = FALSE)
+wrap_plots(plots = plots, ncol = 1)
+```
+
+Integration on datasets normalized with SCTransform
+```{r}
+all.list <- readRDS("/Users/josongco/Desktop/topographicalMapping/datasets/completeLRTB.rds")
+options(future.globals.maxSize = 8000 * 1024^2)
+all.list <- lapply(X = all.list, FUN = SCTransform)
+features <- SelectIntegrationFeatures(object.list = all.list, nfeatures = 3000)
+all.list <- PrepSCTIntegration(object.list = all.list, anchor.features = features)
+all.anchors <- FindIntegrationAnchors(object.list = all.list, normalization.method = "SCT",
+    anchor.features = features)
+all.combined.sct <- IntegrateData(anchorset = all.anchors, normalization.method = "SCT")
+
+saveRDS(all.combined.sct, "/Users/josongco/Desktop/topographicalMapping/datasets/completeLRTB-IntegratedSct.rds")
+saveRDS(all.combined.sct, "/Users/josongco/Desktop/topographicalMapping/datasets/completeLR-IntegratedSct.rds")
+saveRDS(all.combined.sct, "/Users/josongco/Desktop/topographicalMapping/datasets/completeTB-IntegratedSct.rds")
+all.combined.sct <- readRDS("/Users/josongco/Desktop/topographicalMapping/datasets/completeLRTB-IntegratedSct.rds")
+```
+
+
+# Neurons UMAP from Songco-Casey et al., 2022
+```{r}
+neurons_ordered <- readRDS("/Users/josongco/Desktop/Cell Types Seurat Code & Files/FinalNeuronsUMAP-ordered.rds") 
+DimPlot(neurons_ordered, label = TRUE, cols = UMAPcolors)
+
+neurons_ordered_renamed <- RenameIdents(neurons_ordered, '18' = "immature", '19' = "immature", '20' = "immature", '27' = "immature", '22' = "immature", '23' = "immature", '24' = "immature", '25' = "immature", '26' = "immature", 
+                                         '10' = "dopaminergic", '11' = "dopaminergic", '12' = "dopaminergic", '13' = "dopaminergic", '14' = "dopaminergic", '15' = "dopaminergic", '16' = "dopaminergic", '17' = "dopaminergic",
+                                         '5' = "dopaminergic+glutamatergic", '6' = "dopaminergic+glutamatergic", '36' = "dopaminergic+glutamatergic",
+                                         '28' = "glutamatergic", '29' = "glutamatergic", '30' = "glutamatergic", '31' = "glutamatergic", '32' = "glutamatergic", '33' = "glutamatergic", '34' = "glutamatergic",
+                                         '7' = "cholinergic", '8' = "cholinergic", '9' = "cholinergic", '35' = "cholinergic",
+                                         '4' = "octopaminergic", 
+                                         '37' = "orcokinin")
+UMAPcolors_lumped <- c('hotpink', 'steelblue', 'darkseagreen', 'goldenrod', 'sienna1', 'red', 'purple4')
+DimPlot(neurons_ordered_renamed, label = TRUE, cols = UMAPcolors_lumped)
+
+levels(neurons_ordered_renamed)
+neurons_ordered_renamed$seurat_clusters <- levels(neurons_ordered_renamed)
+```
+
+```{r}
+#all.combined.sct_trialNames <- all.combined.sct
+#all.combined.sct_trialNames$seurat_clusters <- levels(neurons_ordered_renamed)
+
+#p1 <- DimPlot(all.combined.sct_trialNames, reduction = "umap", group.by = "orig.ident")
+#p2 <- DimPlot(all.combined.sct_trialNames, reduction = "umap", group.by = "seurat_clusters", label = TRUE, repel = TRUE)
+#p1 + p2
+
+p1 <- DimPlot(neurons_ordered_renamed, group.by = "orig.ident", label = TRUE)
+p2 <- DimPlot(neurons_ordered_renamed, group.by = "seurat_clusters", label = TRUE, cols = UMAPcolors_lumped) # doesn't reflect what I was hoping it would
+p1 + p2
+
+saveRDS(neurons_ordered_renamed, "/Users/josongco/Desktop/topographicalMapping/datasets/neuronsLumped.rds")
+```
+
+
+
+```{r}
+DefaultAssay(all.combined) <- "SCT"
+pdf(file = "/Users/josongco/Desktop/topographicalMapping/sct_LR.top30clusters.pdf",
+    width = 10, # The width of the plot in inches
+    height = 10) # 
+for (m in 0:(nlevels(all.combined$seurat_clusters)-1)){
+  clustermarkers_i <- FindMarkers(all.combined, ident.1 = m, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
+  clustermarkers_i$diff_exp <- (clustermarkers_i$pct.1/clustermarkers_i$pct.2)
+  
+  clustermarkers_i <- clustermarkers_i[order(-clustermarkers_i$diff_exp), ]
+top30_genes <- rownames(clustermarkers_i)[1:30]
+top30_genes <- data.frame(top30_genes)
+  top30_genes<-addGeneNamesTable(top30_genes,top30_genes$top30_genes,gene_master$obgene, gene_master$merge_desc)
+  
+  print(top30_genes) #top30
+  p<-DotPlot(all.combined,features=top30_genes$top30_genes, cols = c("blue","red"), split.by = "orig.ident") + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(axis.text.y = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + NoLegend() #top30
+  p<-replaceLabelsX(p,gene_master$obgene,gene_master$merge_desc)
+  p <- p+ coord_flip()
+  p <- p+ ggtitle(paste('top30 for cluster', m, sep = " ")) 
+  print(p)  
+}
+
+dev.off()
+```
+
+
+
+```{r}
+DefaultAssay(allcombined.celltypesample) <- "SCT"
+pdf(file = "/Users/josongco/Desktop/topographicalMapping/sct_TB.top50samples-avgLog2FC.pdf",
+    width = 10, # The width of the plot in inches
+    height = 10) # 
+for (m in 0:(nlevels(allcombined.celltypesample$seurat_clusters)-1)){
+  clustermarkers_i <- FindMarkers(allcombined.celltypesample, ident.1 = paste(m, "Sample3", sep = "_"), ident.2 = paste(m, "Sample4", sep = "_"), logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
+  clustermarkers_i$diff_exp <- (clustermarkers_i$pct.1/clustermarkers_i$pct.2)
+  
+  clustermarkers_i <- clustermarkers_i[order(-(abs(clustermarkers_i$avg_log2FC))), ]
+top50_genes <- rownames(clustermarkers_i)[1:50]
+top50_genes <- data.frame(top50_genes)
+  top50_genes<-addGeneNamesTable(top50_genes,top50_genes$top50_genes,gene_master$obgene, gene_master$merge_desc)
+  
+  #print(top30_genes) #top30
+  p<-DotPlot(allcombined.celltypesample.order,features=top50_genes$top50_genes, cols = c("blue","red"), split.by = "orig.ident") + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(axis.text.y = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + NoLegend() #top30
+  p<-replaceLabelsX(p,gene_master$obgene,gene_master$merge_desc)
+  p <- p+ coord_flip()
+  #p <- p+ ggtitle(paste('topvbot top50 for ident', m, sep = " ")) 
+  print(p)  
+}
+
+dev.off()
+
+
+FeaturePlot(allcombined.celltypesample.order, features = top50_genes$top50_genes[1:5])
+
+
+allcombined.celltypesample.order <- allcombined.celltypesample
+levels(allcombined.celltypesample.order) <- order
+
+
+example.response <- FindMarkers(allcombined.celltypesample, ident.1 = "0_Sample3", ident.2 = "0_Sample4", verbose = FALSE)
+head(example.response, n = 15)
+example.response <- rownames(example.response)
+example.response <- data.frame(example.response)
+example.response$gene <- example.response$example.response
+example.response <- addGeneNamesTable(example.response, example.response$gene, example.response$gene, gene_master$merge_desc)
+top30_btwn <- head(example.response, n = 30)
+```
+
