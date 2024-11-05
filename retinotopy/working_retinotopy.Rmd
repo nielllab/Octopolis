@@ -1,0 +1,352 @@
+---
+title: "Standard normalization, integration of retinotopy data"
+output: html_notebook
+---
+
+```{r, require = T}
+library(Seurat) # 
+library(Matrix)
+library(ggplot2)
+library(sctransform)
+library(stringr)
+library(cowplot) # used for CCA
+library(patchwork) # used for CCA
+library(dplyr) # used for print markers
+library(here) # notes path for easy access in commands
+library(scCustomize)
+options("SCpubr.verbose" = FALSE)
+library(SCpubr)
+library(tidyverse)
+library(ggplot2)
+library(future)
+options(future.globals.maxSize = 10000 * 1024^2)
+plan("multisession")
+plan()
+```
+
+### Functions for changing gene names on figures, etc.
+```{r}
+
+# function to add gene names to data table
+# assumes first column of table is G gene
+# uses master list with gene name in 1st column, G gene in 3rd column
+addGeneNamesTable<- function(data,geneID, gene, desc){ # a little redundant to send in geneID but this solves the problem that different objects name it differently
+  data$GeneName <- '' # create empty column
+  for (i in 1:nrow(data)){
+    #ggene = data$gene[[i]] #cluster markers
+    obgene = geneID[[i]] # individual cluster markers
+    #ggene = data$Feature[[i]] #dimheatmap
+    #ggene = data$feature[[i]] #viz dim loadings
+    loc <- which(gene ==obgene)
+    if (length(loc)>0) {  # if something is found
+      data$GeneName[[i]] <- desc[loc[1]] # if multiple found, use 1st one
+    }
+  }
+  
+  data
+}
+
+replaceLabelsX <- function(p,gene,desc){
+  pp<- ggplot_build(p)
+  oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x$breaks
+  newxlabels = oldxlabels
+  for (i in 1:length(oldxlabels)){
+    loc<-which(gene==(oldxlabels[[i]]))
+    if (length(loc)>0){
+      newxlabels[[i]] = paste(oldxlabels[[i]], "-", desc[[loc[1]]])
+      newxlabels[[i]] = substr(newxlabels[[i]],1,100)}}
+  p<- p + scale_x_discrete(labels = newxlabels)
+}
+
+replaceLabelsY <- function(p,gene,desc){
+  pp<- ggplot_build(p)
+  oldylabels = ggplot_build(p)$layout$panel_params[[1]]$y$breaks
+  newylabels = oldylabels
+  for (i in 1:length(oldylabels)){
+    loc<-which(gene==(oldylabels[[i]]))
+    if (length(loc)> 0) {
+      newylabels[[i]] = paste(oldylabels[[i]], "-", desc[[loc[1]]])
+      newylabels[[i]] = substr(newylabels[[i]],1,100)}}
+  p<- p + scale_y_discrete(labels = newylabels)
+}
+
+shorten <- function(x)
+{
+  stringr::str_trunc(x, 50)
+}
+
+```
+
+
+
+### Reading in GeneIDs table, shortening the number of characters in merge_desc column
+```{r}
+
+gene_master <- read_csv(here("data","GeneIDs.csv"))
+
+gene_master <- gene_master %>% mutate(short_merge = shorten(merge_desc))
+```
+
+### Import raw data
+
+```{r}
+# data are stored on external drive, and symbolic links created in the local folder to access the external data
+
+v <- Read10X_h5(here("data","topo_sample_cellranger_filtered_counts", "h5","B_filtered_feature_bc_matrix.h5"))
+d <- Read10X_h5(here("data","topo_sample_cellranger_filtered_counts", "h5","T_filtered_feature_bc_matrix.h5"))
+a <- Read10X_h5(here("data","topo_sample_cellranger_filtered_counts", "h5","R_filtered_feature_bc_matrix.h5"))
+p <- Read10X_h5(here("data","topo_sample_cellranger_filtered_counts", "h5","L_filtered_feature_bc_matrix.h5"))
+```
+
+
+```{r}
+vsc <- CreateSeuratObject(counts = v, project = "ventral", min.cells = 3, min.features = 200)
+vsc<- AddMetaData(vsc, "ventral", col.name = "sample")
+
+dsc <- CreateSeuratObject(counts = d, project = "dorsal", min.cells = 3, min.features = 200)
+dsc<- AddMetaData(dsc, "dorsal", col.name = "sample")
+
+asc <- CreateSeuratObject(counts = a, project = "anterior", min.cells = 3, min.features = 200)
+asc<- AddMetaData(asc, "anterior", col.name = "sample")
+
+psc <- CreateSeuratObject(counts = p, project = "posterior", min.cells = 3, min.features = 200)
+psc<- AddMetaData(lsc, "posterior", col.name = "sample")
+
+all.list<- merge(vsc, y= c(dsc,asc,psc), add.cell.ids = c("ventral","dorsal","anterior","posterior"), project = "retinotopy")
+Layers(all.list[["RNA"]])
+
+all.list
+
+
+```
+
+### QCs for counts, features and mitochondrial genes
+
+```{r}
+Thresh_nCount_all.lists <- VlnPlot(all.list, features = "nCount_RNA", y.max = 35000, pt.size = 0) + geom_hline(yintercept=1000, linetype='dotted', col = 'black', linewidth = 1.5) + geom_hline(yintercept=20000, linetype='dotted', col = 'black', linewidth = 1.5)
+
+Thresh_nFeat_all.lists <- VlnPlot(all.list, features = "nFeature_RNA", y.max = 8000, pt.size = 0) + geom_hline(yintercept=600, linetype='dotted', col = 'black', linewidth = 1.5)
+
+grep( "^[^obimac]", rownames(all.list), value = T)
+genes_percent.mt <- grep( "^[^obimac]", rownames(all.list), value = T)
+all.list[["percent.mt"]]<- PercentageFeatureSet(all.list, pattern = "^[^obimac]")
+
+
+Thresh_MT_all.lists <- VlnPlot(all.list, features = "percent.mt", y.max = 30, pt.size = 0) + geom_hline(yintercept=6, linetype='dotted', col = 'black', linewidth = 1.5)
+
+QC_plots_unfiltered_cells <- Thresh_nCount_all.lists + Thresh_nFeat_all.lists + Thresh_MT_all.lists +
+  plot_layout(ncol = 3)
+
+ggsave(here("outputs","20241029_QC_plots_unfiltered_unnormalized_cells.png"), plot = QC_plots_unfiltered_cells, height = 12, width = 24, units = "in")
+
+all.list<- subset(all.list, subset = percent.mt < 6 & nCount_RNA > 1000 & nCount_RNA < 20000 & nFeature_RNA > 600)
+
+```
+
+
+```{r}
+topo <- NormalizeData(topo)
+topo <- FindVariableFeatures(topo)
+topo <- ScaleData(topo)
+topo <- RunPCA(topo, reduction.name = "pca.fil_std_unint")
+topo <- FindNeighbors(topo, dims = 1:30, reduction = "pca.fil_std_unint")
+topo <- FindClusters(topo, resolution = 1, cluster.name = "fil_std_unint_clusters")
+topo <- RunUMAP(topo, dims = 1:30, reduction = "pca.fil_std_unint", reduction.name = "umap.fil_std_unint")
+fil_std_unint_dimplot<- DimPlot(topo, reduction = "umap.fil_std_unint", group.by = c("sample", "seurat_clusters"), label = TRUE, repel = TRUE)
+
+ggsave(here("outputs","20241029_fil_std_unint_dimplot.png"), plot = fil_std_unint_dimplot, height = 12, width = 24, units = "in")
+
+saveRDS(topo, here("data","fil_std_unint_clustered.RDS"))
+
+```
+
+
+### Performing RPCA Integration on the filtered dataset
+```{r}
+topo <- IntegrateLayers(object = topo, method = 'RPCAIntegration', orig.reduction = "pca.fil_std_unint", new.reduction = "integrated.rpca", verbose = TRUE)
+
+topo[["RNA"]] <- JoinLayers(topo[["RNA"]])
+
+topo <- FindNeighbors(topo, reduction = "integrated.rpca", dims = 1:30)
+topo <- FindClusters(topo, resolution = 1)
+topo <- RunUMAP(topo, dims = 1:30, reduction = "integrated.rpca", reduction.name = "umap.int_rpca")
+saveRDS(topo, here("data","fil_std_RPCA_integrated.RDS"))
+
+fil_std_rpca_int_clusters <- DimPlot(topo, reduction = "umap.int_rpca", group.by = c("sample", "seurat_clusters"), label = TRUE, repel = TRUE)
+fil_std_rpca_int_clusters
+
+ggsave(here('outputs','20241029_fil_std_RPCA_integrated_dimplot.png'), plot = fil_std_rpca_int_clusters, device = png, width = 14, unit = 'in')
+
+fil_std_rpca_int_clusters_by_sample <- DimPlot(topo, reduction = "umap.int_rpca", split.by = "sample", label = TRUE, repel = TRUE)
+fil_std_rpca_int_clusters_by_sample
+
+ggsave(here('outputs','20241029_fil_std_RPCA_integrated_by_sample_dimplot.png'), plot = fil_std_rpca_int_clusters_by_sample, device = png, width = 14, unit = 'in')
+
+
+unint_rpca_int_dimplots <- fil_std_unint_dimplot/fil_std_rpca_int_clusters
+unint_rpca_int_dimplots
+
+ggsave(here('outputs','20241029_DimPlot_before_after_std_rpca_integration.png'), plot = unint_rpca_int_dimplots, device = png, width = 14, height = 14, unit = 'in')
+
+table(topo@meta.data$RNA_snn_res.1, topo@meta.data$orig.ident)
+
+cell_per_cluster_by_sample_tbl<- tibble(rpca_cluster = topo@meta.data$RNA_snn_res.1, sample = topo@meta.data$orig.ident) %>%
+  mutate(rpca_cluster = as.numeric(as.character(rpca_cluster))) %>% 
+  group_by(sample) %>% 
+  count(rpca_cluster) %>% 
+  pivot_wider(names_from = sample, values_from = n) %>% 
+  rename(ventral = "bottom", dorsal = "top", anterior = "right", posterior = "left") %>% 
+  select(rpca_cluster, dorsal, ventral, anterior, posterior)
+
+write_tsv(cell_per_cluster_by_sample_tbl,here("outputs","num_cell_by_cluster_per_sample_rpca_int.tsv"))
+
+#topo<- JoinLayers(topo)#topo<- JointopoLayers(topo)
+#saveRDS(here("data","joined_RPCA_integrated.RDS"))
+```
+
+### Differential gene expression by sample on RPCA integrated dataset
+```{r}
+aggregate_topo <- AggregateExpression(topo, group.by = "sample", return.seurat = TRUE)
+
+# create identies based on boolean combination of properties
+
+# this string contains the values you want (e.g. bottom_5 for bottom sample, cluster 5)
+topo$celltype.sample <- paste(topo$sample,topo$seurat_clusters,sep="_")
+# this sets identities to the strings
+Idents(topo)<-"celltype.sample"
+
+markers<-FindMarkers(topo, ident.1 = "bottom_0", ident.2 = "top_0", verbose = FALSE)
+
+
+```
+
+
+
+
+```{r}
+# loop over all clusters and find markers separating top and bottom
+# need to have set up sample + celltype idents above
+
+markerNames <- tibble(p_val = NA, avg_log2FC = NA, pct.1 = NA, pct.2 = NA, p_val_adj = NA, GeneName = NA)
+
+#columns <- colnames(markerNames)
+
+for (i in 0:length(unique(topo$seurat_clusters))){
+#for (i in 0:0){
+  # create strings for top and bottom cluster based on loop index
+  g1<-paste("bottom",i,sep="_")
+  g2<- paste("top",i,sep="_")
+  # check to see if there's enough cells in this cluster+sample!
+  if (sum(topo$celltype.sample==g1)>10 & sum(topo$celltype.sample==g2)>10 ){
+    # find markers
+    i <-FindMarkers(topo, ident.1 = g1, ident.2 =g2, verbose = TRUE)
+                         #, only.pos = TRUE)
+    # relabel with gene names
+    markerNames<-addGeneNamesTable(i,row.names(i),gene_master$obgene,gene_master$short_merge)
+    newvals<-markerNames[markerNames$p_val_adj<0.01 & (markerNames$pct.1 >0.25 | markerNames$pct.2 >0.25),]
+    if (exists('allMarkers')){
+      allMarkers<-rbind(allMarkers,newvals)
+    } else{
+      allMarkers<-newvals
+    }
+  }
+  #head(markerNames, n=10)
+  print(head(markerNames,n=10))
+}
+
+
+allMarkers_names <- allMarkers %>% 
+  distinct(GeneName, .keep_all = TRUE) %>% 
+  rownames_to_column() %>% 
+  unite(ob_name, rowname, GeneName, remove = FALSE) %>% 
+  filter(p_val_adj <= 0.001)
+
+genes <- allMarkers_names %>% 
+  select(rowname, ob_name)
+  
+FeaturePlot_scCustom(topo, c("obimac0021926", "obimac0014032", "obimac0032954"), order = TRUE, reduction = "umap.int_rpca")
+
+DotPlot_scCustom(topo, c("obimac0021926", "obimac0014032", "obimac0032954"))
+```
+
+```{r}
+
+Idents(topo) = "sample"
+
+dvv <- subset(topo, idents =  c("bottom", "top"))
+
+DotPlot_scCustom(dvv, genes$rowname, group.by = "sample", flip_axes = TRUE)
+
+DotPlot_scCustom(topo, genes$rowname, group.by = "sample", flip_axes = TRUE)
+
+p<-DotPlot_scCustom(topo, genes$rowname, group.by = "sample") + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(axis.text.y = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) #+ NoLegend() 
+  p<-replaceLabelsX(p,gene_master$obgene,gene_master$short_merge)
+  p <- p+ coord_flip()
+ # p <- p+ ggtitle(paste('(avg_log2FC) top50 for cluster', m, sep = " ")) 
+
+p
+
+DotPlot(topo, genes, group.by = "sample")
+
+DotPlot_scCustom(topo,features = row.names(head(markerNames,n=10)), flip_axes = TRUE)
+```
+
+
+```{r}
+
+```
+
+
+
+```{r}
+ol_markers <- read_tsv(here("data","Songco_Casey_etal_2022_cluster_markers.tsv"), col_names = c("gene","obim"))
+ol_markers <- ol_markers %>%
+  mutate(desc = gene, .keep = 'all')
+
+#whole_ol_class_markers<- c('elav|syt|dat|vglut|slc|chat|vacht|orc|tyrbh|gad')
+
+#non_neuron_markers <- ol_markers %>% filter(., c('pcna|ache|cola|hspg|svep|glul|ob02586'))
+#genes.to.label = c(
+
+whole_ol_class_markers<- c('elav|syt|dat|vglut|slc|chat|vacht|orc|tyrbh|gad')
+whole_ol_class_markers_txt<- str_replace_all(whole_ol_class_markers, fixed("|"), ",'")
+whole_ol_class_markers_list<- c('elav','syt','dat','vglut','slc','chat','vacht','orc','tyrbh','gad')
+
+mini_whole_ol_class_markers_list<- c('syt','dat','slc','vacht','orc','tyrbh')
+mini_whole_ol_class_markers<- c('syt|dat|slc|vacht|orc|tyrbh')
+
+mini_whole_ol_class_markers_v<- as_vector(mini_whole_ol_class_markers_list)
+#format_csv(as.data.frame(whole_ol_class_markers), '|')
+major_class_genes_obims<- ol_markers %>% 
+  filter(str_detect(gene, whole_ol_class_markers)) %>% 
+  select(gene, obim)
+
+major_class_genes_obims_ordered_wider<- major_class_genes_obims %>%
+  arrange(factor(gene, levels = whole_ol_class_markers_list)) %>% 
+  pivot_wider(names_from = gene, values_from = obim) %>% as_vector()
+
+major_class_genes<- major_class_genes_obims %>% select(gene)
+major_class_genes_v<- as_vector(major_class_genes)
+
+major_class_obim<- major_class_genes_obims %>% select(obim)
+major_class_obim_v<- as_vector(major_class_obim)
+
+mini_major_class_ordered_wider<- major_class_genes_obims %>%
+  filter(str_detect(gene, mini_whole_ol_class_markers)) %>%
+  filter(!str_detect(gene, 'syt4/11')) %>% 
+  arrange(factor(gene, levels = mini_whole_ol_class_markers_list)) %>% 
+  pivot_wider(names_from = gene, values_from = obim) %>% as_vector()
+  
+Iterate_FeaturePlot_scCustom(topo, features = major_class_genes_obims_ordered_wider, file_name = 'songco-casey_6_neuron_class_markers_11', file_type = '.pdf', single_pdf = TRUE, features_per_page = 11)
+
+Iterate_FeaturePlot_scCustom(topo, features = mini_major_class_ordered_wider, file_name = 'songco-casey_fig2_6_neuron_class_markers_6', file_type = '.pdf', single_pdf = TRUE, features_per_page = 12)
+
+
+dp<- DotPlot_scCustom(topo,features = major_class_genes_obims_ordered_wider, cluster.idents = FALSE, group.by = "sample", flip_axes = FALSE)
+
+dp
+
+ggsave(here('outputs','20241030_mini_major_classes_rpca_by_sample_cluster.pdf'), plot = dp, device = pdf, width = 14, height = 28, unit = 'in')
+```
+
+

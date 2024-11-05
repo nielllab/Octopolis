@@ -1,0 +1,607 @@
+---
+title: "DRAFT merge, cluster, filter, cluster OL topo sample scRNAseq"
+output:
+  pdf_document: default
+  html_notebook: default
+html_document: default
+---
+
+### Load libraries
+
+```{r, require = T}
+library(Seurat) # 
+library(Matrix)
+library(ggplot2)
+library(sctransform)
+library(stringr)
+library(cowplot) # used for CCA
+library(patchwork) # used for CCA
+library(dplyr) # used for print markers
+library(here) # notes path for easy access in commands
+library(scCustomize)
+options("SCpubr.verbose" = FALSE)
+library(SCpubr)
+library(tidyverse)
+library(ggplot2)
+library(future)
+options(future.globals.maxSize = 8000 * 1024^2)
+plan("multisession")
+plan()
+```
+
+### Import raw data
+
+```{r}
+# data are stored on external drive, and symbolic links created in the local folder to access the external data
+
+b <- Read10X_h5(here("data","topo_sample_cellranger_filtered_counts", "h5","B_filtered_feature_bc_matrix.h5"))
+t <- Read10X_h5(here("data","topo_sample_cellranger_filtered_counts", "h5","T_filtered_feature_bc_matrix.h5"))
+r <- Read10X_h5(here("data","topo_sample_cellranger_filtered_counts", "h5","R_filtered_feature_bc_matrix.h5"))
+l <- Read10X_h5(here("data","topo_sample_cellranger_filtered_counts", "h5","L_filtered_feature_bc_matrix.h5"))
+```
+
+### Create Seurat objects for each sample and merge into single Seurat(v5) object with layers
+
+```{r}
+bsc <- CreateSeuratObject(counts = b, project = "bottom", min.cells = 3, min.features = 500)
+bsc<- AddMetaData(bsc, "bottom", col.name = "sample")
+#Idents(bsc)<- "bottom"
+tsc <- CreateSeuratObject(counts = t, project = "top", min.cells = 3, min.features = 500)
+tsc<- AddMetaData(tsc, "top", col.name = "sample")
+#Idents(tsc)<- "top"
+rsc <- CreateSeuratObject(counts = r, project = "right", min.cells = 3, min.features = 500)
+rsc<- AddMetaData(rsc, "right", col.name = "sample")
+#Idents(rsc)<- "right"
+lsc <- CreateSeuratObject(counts = l, project = "left", min.cells = 3, min.features = 500)
+lsc<- AddMetaData(lsc, "left", col.name = "sample")
+#Idents(lsc)<- "left"
+
+topos<- merge(bsc, y = c(tsc,rsc,lsc), add.cell.ids = c("b","t","r","l"), project = "all_topos")
+
+topos
+
+saveRDS(topos, here("data","unfiltered_unnormalized_topos.RDS"))
+```
+
+### Load unfiltered, unnormalized datset
+
+```{r}
+qc_t <- readRDS(here("data","unfiltered_unnormalized_topos.RDS"))
+```
+
+### QCs for counts, features and mitochondrial genes
+
+```{r}
+Thresh_nCount_topos <- VlnPlot(qc_t, features = "nCount_RNA", y.max = 35000, pt.size = 0) + geom_hline(yintercept=1000, linetype='dotted', col = 'black', linewidth = 1.5) + geom_hline(yintercept=20000, linetype='dotted', col = 'black', linewidth = 1.5)
+
+Thresh_nFeat_topos <- VlnPlot(qc_t, features = "nFeature_RNA", y.max = 8000, pt.size = 0) + geom_hline(yintercept=600, linetype='dotted', col = 'black', linewidth = 1.5)
+
+grep( "^[^obimac]", rownames(qc_t), value = T)
+genes_percent.mt <- grep( "^[^obimac]", rownames(qc_t), value = T)
+qc_t[["percent.mt"]]<- PercentageFeatureSet(qc_t, pattern = "^[^obimac]")
+
+
+Thresh_MT_topos <- VlnPlot(qc_t, features = "percent.mt", y.max = 30, pt.size = 0) + geom_hline(yintercept=6, linetype='dotted', col = 'black', linewidth = 1.5)
+
+QC_plots_unfiltered_cells <- Thresh_nCount_topos + Thresh_nFeat_topos + Thresh_MT_topos +
+  plot_layout(ncol = 3)
+
+ggsave(here("outputs","20241012_QC_plots_unfiltered_unnormalized_cells.png"), plot = QC_plots_unfiltered_cells, height = 12, width = 24, units = "in")
+
+```
+
+### Normalizing and clustering the unfiltered dataset
+data have to be scaled in order to do any clustering.
+
+### SCTransform normalization on unfiltered cells
+
+```{r}
+unfil_norm_t<- SCTransform(qc_t)
+saveRDS(unfil_norm_t, here("data","unfiltered_SCTransform_topos.RDS"))
+```
+
+### Load unfiltered, normalized dataset
+
+```{r}
+unfil_SCT <- readRDS(here("data","unfiltered_SCTransform_topos.RDS"))
+unfil_SCT
+```
+
+### Cell counts per sample in unfiltered, SCTransform normalized datset
+
+```{r}
+
+b_unfil_dims <- dim(unfil_SCT@assays$RNA$counts.bottom)
+t_unfil_dims <- dim(unfil_SCT@assays$RNA$counts.top)
+r_unfil_dims <- dim(unfil_SCT@assays$RNA$counts.right)
+l_unfil_dims <- dim(unfil_SCT@assays$RNA$counts.left)
+
+```
+
+### PCA, UMAP, TSNE clustering on unfiltered, SCTransformed dataset
+
+```{r}
+unfil_SCT <- RunPCA(unfil_SCT, reduction.name = "pca_unfiltered")
+unfil_SCT <- RunUMAP(unfil_SCT, dims = 1:30, reduction.key = "UMAPunfil", reduction = "pca_unfiltered", reduction.name = "umap_unfiltered")
+unfil_SCT <- RunTSNE(unfil_SCT, dims = 1:30, reduction.key = "TSNEunfil", reduction = "pca_unfiltered", reduction.name = "tsne_unfiltered")
+
+unfil_SCT <- FindNeighbors(unfil_SCT, dims = 1:30, reduction = "pca_unfiltered")
+unfil_SCT <- FindClusters(unfil_SCT, cluster.name = "unfiltered_umap_clusters")
+unfil_umap <- DimPlot(unfil_SCT, label = TRUE, reduction = "umap_unfiltered")
+
+saveRDS(unfil_SCT, here("data","unfiltered_SCTransform_clustered_topos.RDS"))
+```
+
+### Load unfiltered, normalized, clustered dataset
+
+```{r}
+unfil_SCT_clust <- readRDS(here("data","unfiltered_SCTransform_clustered_topos.RDS"))
+unfil_SCT_clust
+
+unfil_umap <- DimPlot(unfil_SCT_clust, label = TRUE, reduction = "umap_unfiltered")
+```
+
+### Cell counts per sample in unfiltered, SCTransform normalized, clustered datset
+
+```{r}
+
+b_unfil_SCT_clust_dims <- dim(unfil_SCT_clust@assays$RNA$counts.bottom)
+b_unfil_SCT_clust_dims
+
+t_unfil_SCT_clust_dims <- dim(unfil_SCT_clust@assays$RNA$counts.top)
+t_unfil_SCT_clust_dims
+
+r_unfil_SCT_clust_dims <- dim(unfil_SCT_clust@assays$RNA$counts.right)
+r_unfil_SCT_clust_dims
+
+l_unfil_SCT_clust_dims <- dim(unfil_SCT_clust@assays$RNA$counts.left)
+l_unfil_SCT_clust_dims
+
+```
+
+### Cluster stats on unfiltered, SCTransformed, clustered dataset, and stacked barplot
+
+```{r}
+unfil_clust_stats <- Cluster_Stats_All_Samples(unfil_SCT_clust)
+write_tsv(unfil_clust_stats, here("outputs","unfiltered_cluster_stats.tsv"))
+
+unfil_clust_stats_long <- unfil_clust_stats %>% 
+  select(Cluster, bottom, top, right, left) %>% 
+  pivot_longer(., cols = !Cluster, names_to = "sample") %>% 
+  filter(!str_detect(Cluster, "Total"))
+
+unfil_stacked_clust_stats <- ggplot(unfil_clust_stats_long, aes(fill = sample, y=value, x=Cluster)) +
+    geom_bar(position="stack", stat="identity")
+
+unfil_stacked_clust_stats
+
+ggsave(here("outputs","unfil_stacked_clust_stats.png"), plot = unfil_stacked_clust_stats, height = 10, width = 20, units = "in")
+
+```
+
+### Map % mito content in unfiltered dataset onto UMAP
+
+```{r} 
+#### Viridis F-- black to red to white
+pmt1 <- do_FeaturePlot(unfil_SCT_clust, features = "percent.mt", reduction = "umap_unfiltered", max.cutoff = 60, plot_cell_borders = FALSE, order = FALSE, na.value = "gray95", use_viridis = TRUE, viridis.palette = "F", viridis.direction = 1, plot.subtitle = "Unfiltered unintegrated 60% mito content, unordered")
+
+pmt1
+
+pmt2 <- do_FeaturePlot(unfil_SCT_clust, features = "percent.mt", reduction = "umap_unfiltered", max.cutoff = 30, plot_cell_borders = FALSE, order = FALSE, na.value = "gray95", use_viridis = TRUE, viridis.palette = "F", viridis.direction = 1, plot.subtitle = "Unfiltered unintegrated 30% mito content, unordered")
+
+pmt2
+
+pmt3 <- do_FeaturePlot(unfil_SCT_clust, features = "percent.mt", reduction = "umap_unfiltered", max.cutoff = 30, plot_cell_borders = FALSE, order = TRUE, na.value = "gray95", use_viridis = TRUE, viridis.palette = "F", viridis.direction = 1, plot.subtitle = "Unfiltered unintegrated 30% mito content, ordered")
+
+pmt3
+
+pmt4 <- do_FeaturePlot(unfil_SCT_clust, features = "percent.mt", reduction = "umap_unfiltered", max.cutoff = 5.9, plot_cell_borders = FALSE, order = FALSE, na.value = "gray95", use_viridis = TRUE, viridis.palette = "F", viridis.direction = 1, plot.subtitle = "Unfiltered unintegrated 6% mito content, unordered")
+
+pmt4
+
+```
+
+```{r}
+#### Viridis = FALSE (default setting), uses standard viridis color
+
+pmt1 <- do_FeaturePlot(unfil_SCT_clust, features = "percent.mt", reduction = "umap_unfiltered", max.cutoff = 60, plot_cell_borders = FALSE, order = FALSE, na.value = "gray95", plot.subtitle = "Unfiltered, SCTransform normalized, clustered data, 60% mito content threshold, unordered")
+
+pmt1
+
+pmt2 <- do_FeaturePlot(unfil_SCT_clust, features = "percent.mt", reduction = "umap_unfiltered", max.cutoff = 30, plot_cell_borders = FALSE, order = FALSE, na.value = "gray95", plot.subtitle = "Unfiltered, SCTransform normalized, clustered data 30% mito content threshold, unordered")
+
+pmt2
+
+pmt3 <- do_FeaturePlot(unfil_SCT_clust, features = "percent.mt", reduction = "umap_unfiltered", max.cutoff = 30, plot_cell_borders = FALSE, order = TRUE, na.value = "gray95", plot.subtitle = "Unfiltered, SCTransform normalized, clustered data 30% mito content threshold, ordered")
+
+pmt3
+
+pmt4 <- do_FeaturePlot(unfil_SCT_clust, features = "percent.mt", reduction = "umap_unfiltered", max.cutoff = 5.9, plot_cell_borders = FALSE, order = FALSE, na.value = "gray95", plot.subtitle = "Unfiltered, SCTransform normalized, clustered data 6% mito content threshold, unordered")
+
+pmt4
+```
+
+### Plot unfiltered, normalized, clustered percent.mt mapping onto UMAP
+
+```{r}
+unfil_pmts <- pmt1 + pmt2 + pmt3 + pmt4 +
+  plot_layout(ncol = 2)
+
+ggsave(here("outputs","unfiltered_multiple_percent_mito_UMAPs.png"), plot = unfil_pmts, height = 12, width = 12, units = "in")
+
+#smt_fp1 <- FeaturePlot(unfil_SCT_clust, reduction = "umap_unfiltered", features = "percent.mt", order = TRUE, max.cutoff = 30)
+#smt_fp1
+
+#ggsave(here("outputs","unfiltered_30percent_mito_UMAP.png"), plot = smt_fp1, height = 8, width = 8, units = "in")
+```
+
+### Plot unfiltered, SCTransform normalized, clustered, UMAP by sample
+
+```{r}
+# get colors
+
+#library("scales")
+#n1 <- length(levels(qc_t$orig.ident))
+#hex_codes1 <- hue_pal()(n1)
+#hex_codes1
+
+
+dp_all <- DimPlot_All_Samples(unfil_SCT_clust, meta_data_column = "orig.ident", colors_use = c("#F8766D","#B983FF","#00C0AF","#93AA00"), reduction = "umap_unfiltered")
+dp_all
+
+dp_all_merge <- DimPlot_scCustom(unfil_SCT_clust, group.by = "orig.ident", ggplot_default_colors = TRUE)
+
+dp_all_merge
+
+dp_all_all <- dp_all_merge + dp_all
+dp_all_all
+
+ggsave(here("outputs","unfiltered_dimplots_by_sample.png"), plot = dp_all_all, height = 10, width = 20, units = "in")
+```
+
+------------------------------------------------------------------------
+
+# Filtering, normalizing and clustering the tidied dataset
+
+## Removing low quality cells from original unfiltered, un-normalized, un-clustered dataset
+
+### Load unfiltered, un-normalized, unclustered dataset
+
+```{r}
+t_un <- readRDS(here("data","unfiltered_unnormalized_topos.RDS"))
+t_un
+```
+
+### Subset dataset based on % mitochondrial content
+
+```{r}
+f_topos<- subset(t_un, subset = percent.mt < 6 & nCount_RNA > 1000 & nCount_RNA < 20000 & nFeature_RNA > 600)
+
+f_topos
+
+saveRDS(f_topos, here("data","filtered_unnormalized_topos.RDS"))
+```
+
+### SCTransform normalization on unfiltered cells
+
+```{r}
+fil_norm_t<- SCTransform(f_topos)
+saveRDS(fil_norm_t, here("data","filtered_SCTransform_topos.RDS"))
+```
+
+
+### Load filtered, SCTransform normalized dataset to perform clustering
+
+```{r}
+fil_sct <- readRDS(here("data","filtered_SCTransform_topos.RDS"))
+fil_sct 
+```
+
+### PCA, UMAP, TSNE clustering on filtered, SCTransform normalized cells
+```{r}
+fil_sct_clust <- RunPCA(fil_sct_clust, reduction.name = "pca_filtered")
+fil_sct_clust <- RunUMAP(fil_sct_clust, dims = 1:30, reduction.key = "UMAPfil", reduction = "pca_filtered", reduction.name = "umap_filtered")
+fil_sct_clust <- RunTSNE(fil_sct_clust, dims = 1:30, reduction.key = "TSNEfil", reduction = "pca_filtered", reduction.name = "tsne_filtered")
+
+fil_sct_clust <- FindNeighbors(fil_sct_clust, dims = 1:30, reduction = "pca_filtered")
+fil_sct_clust <- FindClusters(fil_sct_clust, cluster.name = "filtered_umap_clusters")
+
+saveRDS(fil_sct_clust, here("data","filtered_SCTransform_clustered_topos.RDS"))
+```
+
+### Load saved filtered, SCTransformed, clustered dataset
+```{r}
+fil_sct_clust <- readRDS(here("data","filtered_SCTransform_clustered_topos.RDS"))
+fil_sct_clust
+
+
+fil_umap <- DimPlot(fil_sct_clust, label = TRUE, reduction = "umap_filtered")
+fil_umap
+```
+
+### Cell counts per sample in filtered, SCTransform normalized, clustered datset
+```{r}
+
+b_fil_clust_dims <- dim(fil_sct_clust@assays$RNA$counts.bottom)
+b_fil_clust_dims
+
+t_fil_clust_dims <- dim(fil_sct_clust@assays$RNA$counts.top)
+t_fil_clust_dims
+
+r_fil_clust_dims <- dim(fil_sct_clust@assays$RNA$counts.right)
+r_fil_clust_dims
+
+l_fil_clust_dims <- dim(fil_sct_clust@assays$RNA$counts.left)
+l_fil_clust_dims
+
+```
+
+### Plot percent.mt by sample for the unfiltered, transformed, clustered VS filtered, transformed, clustered datasets
+```{r}
+
+#pmt5 <- do_FeaturePlot(fil_sct_clust, features = "percent.mt", reduction = "umap_filtered", max.cutoff = 5.9, plot_cell_borders = FALSE, order = FALSE, na.value = "gray95", use_viridis = TRUE, viridis.palette = "F", viridis.direction = 1, plot.subtitle = "Filtered unintegrated 6% mito content, unordered")
+
+pmt5 <- do_FeaturePlot(fil_sct_clust, features = "percent.mt", reduction = "umap_filtered", max.cutoff = 5.9, plot_cell_borders = FALSE, order = FALSE, na.value = "gray95", plot.subtitle = "Filtered SCTransformed 6% mito content, unordered")
+
+pmt5
+
+unfil_fil_pmts <- pmt1 + pmt2 + pmt3 + pmt4 + pmt5 +
+  plot_layout(ncol = 2)
+
+ggsave(here("outputs","unfiltered_filtered_SCT_percent_mito_UMAPs.png"), plot = unfil_fil_pmts, height = 24, width = 24, units = "in")
+
+
+umaps_pmts <- unfil_umap + fil_umap + pmt4 + pmt5
+  plot_layout(ncol = 2)
+
+ggsave(here("outputs","unfiltered_filtered_SCT_6_percent_mito_UMAPs.png"), plot = umaps_pmts, height = 12, width = 14, units = "in")
+```
+
+### Cluster stats on filtered, SCTransformed, clustered dataset, and stacked barplot
+```{r}
+fil_clust_stats <- Cluster_Stats_All_Samples(fil_sct_clust)
+write_tsv(fil_clust_stats, here("outputs","filtered_cluster_stats.tsv"))
+
+fil_clust_stats_long <- fil_clust_stats %>% 
+  select(Cluster, bottom, top, right, left) %>% 
+  pivot_longer(., cols = !Cluster, names_to = "sample") %>% 
+  filter(!str_detect(Cluster, "Total"))
+
+fil_stacked_clust_stats <- ggplot(fil_clust_stats_long, aes(fill = sample, y=value, x=Cluster)) +
+    geom_bar(position="stack", stat="identity")
+
+fil_stacked_clust_stats
+
+ggsave(here("outputs","fil_stacked_clust_stats.png"), plot = fil_stacked_clust_stats, height = 10, width = 20, units = "in")
+
+```
+
+### Umap by sample, filtered, SCTransform normalized, clustered
+```{r}
+dp_all_fil <- DimPlot_All_Samples(fil_sct_clust, meta_data_column = "orig.ident", colors_use = c("#F8766D","#B983FF","#00C0AF","#93AA00"), reduction = "umap_filtered")
+dp_all_fil
+
+dp_all_fil_merge <- DimPlot_scCustom(fil_sct_clust, reduction = "umap_filtered", group.by = "orig.ident", ggplot_default_colors = TRUE)
+
+dp_all_fil_merge
+
+dp_all_fil_all <- dp_all_fil_merge + dp_all_fil
+dp_all_fil_all
+
+ggsave(here("outputs","filtered_dimplots_by_sample.png"), plot = dp_all_fil_all, height = 10, width = 20, units = "in")
+```
+
+### Load in candidate markers
+
+```{r}
+# Songco-Casey markers
+ol_markers <- read_tsv(here("data","Songco_Casey_etal_2022_cluster_markers.tsv"), col_names = c("gene","obim"))
+ol_markers <- ol_markers %>%
+  mutate(desc = gene, .keep = 'all')
+
+## SCpubr plots
+
+whole_ol_class_markers<- c('elav|syt|dat|vglut|slc|chat|vacht|orc|tyrbh|gad')
+whole_ol_class_markers_txt<- str_replace_all(whole_ol_class_markers, fixed("|"), ",'")
+whole_ol_class_markers_list<- c('elav','syt','dat','vglut','slc','chat','vacht','orc','tyrbh','gad')
+
+mini_whole_ol_class_markers_list<- c('syt','dat','slc','vacht','orc','tyrbh')
+mini_whole_ol_class_markers<- c('syt|dat|slc|vacht|orc|tyrbh')
+
+mini_whole_ol_class_markers_v<- as_vector(mini_whole_ol_class_markers_list)
+#format_csv(as.data.frame(whole_ol_class_markers), '|')
+major_class_genes_obims<- ol_markers %>% 
+  filter(str_detect(gene, whole_ol_class_markers)) %>% 
+  select(gene, obim)
+
+major_class_genes_obims_ordered_wider<- major_class_genes_obims %>%
+  arrange(factor(gene, levels = whole_ol_class_markers_list)) %>% 
+  pivot_wider(names_from = gene, values_from = obim) %>% as_vector()
+
+major_class_genes<- major_class_genes_obims %>% select(gene)
+major_class_genes_v<- as_vector(major_class_genes)
+
+major_class_obim<- major_class_genes_obims %>% select(obim)
+major_class_obim_v<- as_vector(major_class_obim)
+
+mini_major_class_ordered_wider<- major_class_genes_obims %>%
+  filter(str_detect(gene, mini_whole_ol_class_markers)) %>%
+  filter(!str_detect(gene, 'syt4/11')) %>% 
+  arrange(factor(gene, levels = mini_whole_ol_class_markers_list)) %>% 
+  pivot_wider(names_from = gene, values_from = obim) %>% as_vector()
+ 
+
+#format_csv(ol_markeras.list()#format_csv(ol_markers)
+
+Iterate_FeaturePlot_scCustom(fil_sct_clust, features = major_class_genes_obims_ordered_wider, file_name = here("outputs",'songco-casey_6_neuron_class_markers_11'), file_type = '.pdf', single_pdf = TRUE, features_per_page = 11)
+
+Iterate_FeaturePlot_scCustom(fil_sct_clust, features = mini_major_class_ordered_wider, file_name = here("outputs",'songco-casey_fig2_6_neuron_class_markers_6'), file_type = '.pdf', single_pdf = TRUE, features_per_page = 6)
+```
+
+### Dotplot for candidate markers
+
+```{r}
+dotp<- DotPlot_scCustom(fil_sct_clust,features = major_class_genes_obims_ordered_wider, cluster.idents = TRUE, flip_axes = FALSE, x_lab_rotate = TRUE)
+
+ggsave(here("outputs",'songco-casey_6_major_class_markers_dotplot.jpg'), plot = dotp, height = 12, width = 12, units = "in")
+```
+
+### UMAP clustering without mitochondrial genes
+```{r}
+var_feat_no_MT <- grep("^[^obimac]", fil_sct_clust@assays$SCT@var.features, value = TRUE, invert = TRUE)
+
+fil_sct_clust <- RunPCA(fil_sct_clust, reduction.name = "no_MT_pca_filtered", features = var_feat_no_MT)
+fil_sct_clust <- RunUMAP(fil_sct_clust, reduction.key = "UMAPnoMTfil", reduction = "no_MT_pca_filtered", reduction.name = "umap_no_MT_filtered", features = var_feat_no_MT)
+
+fil_sct_clust <- FindNeighbors(fil_sct_clust, reduction = "no_MT_pca_filtered", features = var_feat_no_MT)
+fil_sct_clust <- FindClusters(fil_sct_clust, cluster.name = "no_MT_filtered_umap_clusters")
+
+#no_MT_umap <- DimPlot(fil_sct_clust, label = TRUE, reduction = "umap_no_MT_filtered", repel = TRUE)
+#no_MT_umap
+
+
+
+#pmt6 <- do_FeaturePlot(fil_sct_clust, features = "percent.mt", reduction = "umap_no_MT_filtered", max.cutoff = 5.9, plot_cell_borders = FALSE, order = TRUE, na.value = "gray95", plot.subtitle = "Filtered no MT features, ordered")
+
+#pmt6
+
+
+#mt_umaps <- unfil_umap + fil_umap + no_MT_umap + pmt4 + pmt5 + pmt6 +
+  #plot_layout(ncol = 3)
+  
+#mt_umaps
+
+#ggsave(here("outputs","mito_content_UMAPs.png"), plot = mt_umaps, height = 12, width = 22, units = "in")
+
+saveRDS(fil_sct_clust, here("data","no_MT_filtered_SCTransform_clustered_topos.RDS"))
+```
+
+
+### UMAPs by sample with no mito genes
+```{r}
+dp_all_fil_no_MT <- DimPlot_All_Samples(fil_sct_clust, meta_data_column = "orig.ident", colors_use = c("#F8766D","#B983FF","#00C0AF","#93AA00"), reduction = "umap_no_MT_filtered")
+dp_all_fil_no_MT
+
+dp_all_fil_no_MT_merge <- DimPlot_scCustom(fil_sct_clust, reduction = "umap_no_MT_filtered", group.by = "orig.ident", ggplot_default_colors = TRUE)
+
+dp_all_fil_no_MT_merge
+
+dp_all_fil_no_MT_all <- dp_all_fil_no_MT_merge + dp_all_fil_no_MT
+dp_all_fil_no_MT_all
+
+ggsave(here("outputs","no_MT_filtered_dimplots_by_sample.png"), plot = dp_all_fil_no_MT_all, height = 10, width = 20, units = "in")
+
+
+
+Iterate_FeaturePlot_scCustom(fil_sct_clust, features = mini_major_class_ordered_wider, file_name = here("outputs",'no_MT_songco-casey_fig2_6_neuron_class_markers_6'), file_type = '.pdf', single_pdf = TRUE, features_per_page = 6, reduction = "umap_no_MT_filtered")
+```
+
+### Cluster stats on filtered, SCTransformed, clustered dataset, and stacked barplot
+
+```{r}
+no_MT_fil_clust_stats <- Cluster_Stats_All_Samples(fil_sct_clust)
+write_tsv(no_MT_fil_clust_stats, here("outputs","no_MT_filtered_cluster_stats.tsv"))
+
+no_MT_fil_clust_stats_long <- no_MT_fil_clust_stats %>% 
+  select(Cluster, bottom, top, right, left) %>% 
+  pivot_longer(., cols = !Cluster, names_to = "sample") %>% 
+  filter(!str_detect(Cluster, "Total"))
+
+no_MT_fil_stacked_clust_stats <- ggplot(no_MT_fil_clust_stats_long, aes(fill = sample, y=value, x=Cluster)) +
+    geom_bar(position="stack", stat="identity")
+
+no_MT_fil_stacked_clust_stats
+
+ggsave(here("outputs","no_MT_fil_stacked_clust_stats.png"), plot = no_MT_fil_stacked_clust_stats, height = 10, width = 20, units = "in")
+
+```
+
+
+
+# Differential gene expression on filtered, normalized, clustered dataset
+
+### Preparing SCT dataset using "PrepSCTFindMarkers" command
+```{r}
+
+fil_sct_clust <- PrepSCTFindMarkers(fil_sct_clust)
+
+fil_sct_clust_findmarkers <- fil_sct_clust
+
+saveRDS(fil_sct_clust_findmarkers, here("data","FindMarkers_filtered_SCTransform_clustered_topos.RDS"))
+
+
+
+
+#grep( "^[^obimac]", rownames(fil_sct_clust), value = T)
+#genes_wo_mt <- grep("^[^obimac]", rownames(fil_sct_clust), value = TRUE, invert = TRUE)
+#fil_sct_clust[["percent.mt"]]<- PercentageFeatureSet(fil_sct_clust, pattern = "^[^obimac]")
+```
+
+
+```{r}
+DimPlot(fil_sct_clust_findmarkers, label = TRUE) + NoLegend()
+#DimPlot(neurons_ordered, label = TRUE) + NoLegend()
+
+#png("cluster_DEG.png", width = 12, height = 7, units = "in", res = 300)
+```
+
+```{r fig.width=14, fig.height=7}
+
+fil_sct_clust_findmarkers_splitlist<-SplitObject(fil_sct_clust_findmarkers, split.by = "ident")
+
+###assign identity as condition
+for (i in 1:length(SeuratObject_splitlist)) {
+Idents(SeuratObject_splitlist[[i]]) <- "condition" }
+
+###Check the split object and names of individual cluster in the file
+SeuratObject_splitlist
+
+###cluster wise FC and save the file. FC will be as in the same sequence as the split object cluster sequence separated by header
+SeuratObject_splitlist <- lapply(X = SeuratObject_splitlist, FUN = function(x){
+x <- FindMarkers(x, ident.1 = 'Disease', ident.2= 'Normal', min.pct=0.25, logfc.threshold=0.25)
+write.table(x, file = "SeuratObject_splitlist_Condition_diffgenes.csv", sep = ",", append = TRUE)
+})
+
+
+for (m in 0:1){ #length(allnorm.integrated.tree.ordered)
+    clustermarkers_i <- FindMarkers(fil_sct_clust_findmarkers, ident.1 = m, logfc.threshold = 0.25)
+                                    #,test.use = "roc")
+  clustermarkers_i$diff_exp <- (clustermarkers_i$pct.1/clustermarkers_i$pct.2)
+### Use for roc DEG test
+  #clustermarkers_i <- setNames(cbind(rownames(clustermarkers_i), clustermarkers_i, row.names = NULL), c("geneID", "myAUC", "avg_diff", "power", "avg_log2FC", "pct.1", "pct.2", "diff_exp")) 
+  
+###for wilcox test for DEG
+  clustermarkers_i <- setNames(cbind(rownames(clustermarkers_i), clustermarkers_i, row.names = NULL), c("geneID", "p_val", "avg_log2FC", "pct.1", "pct.2", "p_val_adj","diff_exp")) 
+  clustermarkers_i %>%
+    top_n(n = 50, wt = avg_log2FC) ->top50
+  top50<-addGeneNamesTable(top50,top50$geneID,gene_master$obgene, gene_master$short_merge)
+    
+p<-DotPlot(fil_sct_clust_findmarkers,features=top50$geneID) + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(axis.text.y = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + NoLegend() 
+  p<-replaceLabelsX(p,gene_master$obgene,gene_master$short_merge)
+  p <- p+ coord_flip()
+  p <- p+ ggtitle(paste('(avg_log2FC) top50 for cluster', m, sep = " ")) 
+  print(p) 
+  
+}
+
+#dev.off()
+
+
+#for (i in 0:2){
+#  for (j in 0:2){
+#  i <-  FindMarkers(fil_sct_clust, genes_wo_mt, ident.1 = i, ident.2 = j)
+#  }
+#}
+```
+
+```{r fig.width=20, fig.height=7}
+FeaturePlot(fil_sct_clust_findmarkers, "obimac0027534", order = TRUE)
+
+```
+
+# Session Info
+
+```{r}
+#automagic::make_deps_file()
+sessionInfo()
+```
