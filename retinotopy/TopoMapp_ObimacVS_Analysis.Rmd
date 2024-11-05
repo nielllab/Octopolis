@@ -120,7 +120,7 @@ saveRDS(all.combined, "/Users/josongco/Desktop/topographicalMapping/datasets/com
 saveRDS(all.combined, "/Users/josongco/Desktop/topographicalMapping/datasets/combinedLR.rds")
 saveRDS(all.combined, "/Users/josongco/Desktop/topographicalMapping/datasets/combinedTB.rds")
 
-all.list <- lapply(X = all.list, FUN = SCTransform) 
+all.list <- lapply(X = obj, FUN = SCTransform) 
 features <- SelectIntegrationFeatures(object.list = all.list, nfeatures = 3000)
 
 all.list <- PrepSCTIntegration(
@@ -140,7 +140,7 @@ all.list <- SCTransform(all.list, vars.to.regress = "percent.mt", verbose = FALS
 
 
 # these steps were performed using an earlier version of R and may require additional steps with later versions
- all_list <- lapply(X = all_list, FUN = SCTransform) 
+ all_list <- lapply(X = all_list, FUN = SCTransform)  
  features <- SelectIntegrationFeatures(object.list = all_list, nfeatures = 3000)
  all_list <- PrepSCTIntegration(object.list = all_list, anchor.features = features)
 
@@ -159,18 +159,19 @@ all.combined <- readRDS("/Users/josongco/Desktop/topographicalMapping/datasets/c
 all.combined.sct <- readRDS("/Users/josongco/Desktop/topographicalMapping/datasets/completeLR-IntegratedSct.rds")
 
 DefaultAssay(all.combined.sct) <- "integrated"
+DefaultAssay(all.combined) <- "integrated"
 
 # Run the standard workflow for visualization and clustering
 all.combined <- ScaleData(all.combined, verbose = FALSE) # omit from sct datasets
-all.combined <- RunPCA(all.combined.sct, npcs = 30, verbose = FALSE)
+all.combined <- RunPCA(all.combined, npcs = 50, verbose = FALSE)
 
-ElbowPlot(all.combined)
+ElbowPlot(all.combined,ndims = 50)
 
-all.combined <- RunUMAP(all.combined, reduction = "pca", dims = 1:15)
-all.combined <- FindNeighbors(all.combined, reduction = "pca", dims = 1:15)
+all.combined <- RunUMAP(all.combined, reduction = "pca", dims = 1:25)
+all.combined <- FindNeighbors(all.combined, reduction = "pca", dims = 1:25)
 all.combined <- FindClusters(all.combined, resolution = 0.5)
 
-
+saveRDS(all.combined, "/Users/josongco/Desktop/topographicalMapping/datasets/umapLRTB-std25.rds")
 saveRDS(all.combined, "/Users/josongco/Desktop/topographicalMapping/datasets/umapLRTB.rds")
 saveRDS(all.combined, "/Users/josongco/Desktop/topographicalMapping/datasets/umapTB.sct15d.rds")
 saveRDS(all.combined, "/Users/josongco/Desktop/topographicalMapping/datasets/umapLR.sct15d.rds")
@@ -420,27 +421,31 @@ top30_btwn <- head(example.response, n = 30)
 
 
 genes.to.label <- read.csv("/Users/josongco/Desktop/topographicalMapping/mainGenes.csv")
+genes.to.label <- read.csv("/Users/josongco/Desktop/topographicalMapping/Markers.csv") #change $gene to $description x2
 genes.to.label <- addGeneNamesTable(genes.to.label, genes.to.label$obgene, gene_master$obgene, gene_master$merge_desc)
 #DefaultAssay(all.combined) <- "RNA" # use for standard normalization
  
 DefaultAssay(all.combined) <- "SCT" # use for sct normalization
 
-pdf(file = "/Users/josongco/Desktop/topographicalMapping/LRmainGenesplots-sct15d.pdf",
-    width = 8, # The width of the plot in inches
-    height = 8)
-  p1 <- DimPlot(all.combined, reduction = "umap", group.by = "orig.ident")
-p2 <- DimPlot(all.combined, reduction = "umap", label = TRUE, repel = TRUE)
+pdf(file = "/Users/josongco/Desktop/topographicalMapping/LRTB-standardMarkers.pdf",
+    width = 10, # The width of the plot in inches
+    height = 10)
+DefaultAssay(all.combined) <- "integrated"
+p3 <- DimPlot(all.combined, reduction = "umap", group.by = "newlabels", cols = c("#7CAE00","#00BFC4","#F8766D","#C77CFF"))
+p2 <- DimPlot(all.combined, reduction = "umap", label = TRUE, repel = TRUE, group.by = "seurat_clusters") + NoLegend()
 print(p2)
-print(p1)
-for (features in 1:11){ #without no gene desc 
-  fp <- FeaturePlot(all.combined, features = genes.to.label$obgene[features])
+print(p3)
+
+DefaultAssay(all.combined) <- "SCT"
+for (features in 1:nrow(genes.to.label)){ #with no gene desc 
+  fp <- FeaturePlot(all.combined, features = genes.to.label$obgene[features], order = TRUE)
   fp <- fp + ggtitle(genes.to.label$obgene[features], subtitle = paste(genes.to.label$gene[features]))
   print(fp)
 }
 
-dots <- DotPlot(all.combined, features = genes.to.label$obgene)  + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(axis.text.y = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7))
+DefaultAssay(all.combined) <- "SCT"
+dots <- DotPlot(all.combined, features = genes.to.label$obgene, group.by="seurat_clusters")  + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(axis.text.y = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7))
 dots<-replaceLabelsX(dots,genes.to.label$obgene,genes.to.label$gene)
-dots <- dots 
 print(dots)
 dev.off()
 
@@ -473,6 +478,77 @@ plots <- VlnPlot(all.combined, features = c("G15407", "G13308", "G12130"), split
     pt.size = 0, combine = FALSE)
 wrap_plots(plots = plots, ncol = 1)
 ```
+
+
+# Cris code with criteria
+```{r}
+rm(allMarkers)
+rm(ids)
+
+testing.all.combined <- all.combined
+testing.all.combined$celltype.sample <- paste(testing.all.combined$newlabels,testing.all.combined$seurat_clusters,sep="_")
+
+DefaultAssay(testing.all.combined) <- 'integrated'
+# this sets identities to the strings
+Idents(testing.all.combined)<-"celltype.sample"
+for (i in 0:2){ #length(unique(testing.all.combined$seurat_clusters)))
+#for (i in 0:0){
+  # create strings for top and bottom cluster based on loop index
+  g1<-paste("posterior",i,sep="_")
+  g2<- paste("anterior",i,sep="_")
+  # check to see if there's enough cells in this cluster+sample!
+  if (sum(testing.all.combined$celltype.sample==g1)>100 & sum(testing.all.combined$celltype.sample==g2)>100 ){
+    # find markers
+    markers<-FindMarkers(testing.all.combined, ident.1 = g1, ident.2 =g2, verbose = TRUE)
+    # relabel with gene names
+    markerNames<-addGeneNamesTable(markers,row.names(markers),gene_master$obgene,gene_master$merge_desc)
+    #print top of list
+    print(head(markerNames,n=10))
+    # keep markers that meet criteria (min p-value, fold-change, exp level)
+    newvals<-markerNames[markerNames$p_val_adj<0.01 & (markerNames$pct.1 >0.25 | markerNames$pct.2 >0.25) & abs(markerNames$avg_log2FC)>1.5,]
+    if (exists('allMarkers')){
+      allMarkers<-rbind(allMarkers,newvals)
+      ids<-c(ids,g1,g2)
+    } else{
+      allMarkers<-newvals
+      ids<-c(g1,g2)
+    }
+  }
+}
+
+pdf(file = "/Users/josongco/Desktop/topographicalMapping/crisCode.0_2_featureplot1.pdf",
+    width = 10, # The width of the plot in inches
+    height = 10)
+DefaultAssay(testing.all.combined) <- "integrated"
+p1 <- DimPlot(testing.all.combined, group.by = "seurat_clusters", reduction = "umap", label = TRUE, repel = TRUE) + NoLegend()
+p2 <- DimPlot(testing.all.combined, group.by = "newlabels", cols = c("#7CAE00","#00BFC4","#F8766D","#C77CFF"), repel = TRUE)
+print(p1)
+print(p2)
+
+DefaultAssay(testing.all.combined) <- "RNA"
+for (features in 1:20){
+  fp <- FeaturePlot(testing.all.combined, features = allMarkers$gene[features], order = TRUE)
+  fp <- fp + ggtitle(allMarkers$gene[features], subtitle = paste(allMarkers$GeneName[features]))
+  print(fp)
+}
+dev.off()
+
+pdf(file = "/Users/josongco/Desktop/topographicalMapping/crisCode.0_2_dotplot.pdf",
+    width = 15, # The width of the plot in inches
+    height = 6)
+DefaultAssay(all.combined) <- "RNA"
+  p<-DotPlot(all.combined,features=allMarkers$gene[1:20], cols = c("#7CAE00","#00BFC4","#F8766D","#C77CFF"), split.by = "newlabels") + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(axis.text.y = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) #top30
+  p<-replaceLabelsX(p,gene_master$obgene,gene_master$merge_desc)
+  p <- p+ coord_flip()
+  #p <- p+ ggtitle(paste('topvbot top50 for ident', m, sep = " ")) 
+  print(p)  
+
+
+dev.off()
+```
+
+
+
 
 Integration on datasets normalized with SCTransform
 ```{r}
@@ -556,28 +632,66 @@ dev.off()
 
 
 ```{r}
-DefaultAssay(allcombined.celltypesample) <- "SCT"
-pdf(file = "/Users/josongco/Desktop/topographicalMapping/sct_TB.top50samples-avgLog2FC.pdf",
-    width = 10, # The width of the plot in inches
+DefaultAssay(testing.all.combined) <- "SCT"
+
+rm(clustermarkers_i)
+rm(newvals)
+rm(top50_genes)
+
+  g1 == paste("anterior", m, sep = "_")
+g2 == paste("posterior", m, sep = "_")
+
+pdf(file = "/Users/josongco/Desktop/topographicalMapping/allSct_antvpost_top50-avgLog2FC.pdf",
+    width = 25, # The width of the plot in inches
     height = 10) # 
-for (m in 0:(nlevels(allcombined.celltypesample$seurat_clusters)-1)){
-  clustermarkers_i <- FindMarkers(allcombined.celltypesample, ident.1 = paste(m, "Sample3", sep = "_"), ident.2 = paste(m, "Sample4", sep = "_"), logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
+for (m in 0:(nlevels(testing.all.combined$seurat_clusters)-1)){
+  if (sum(testing.all.combined$celltype.sample==paste("anterior", m, sep = "_"))>100 & sum(testing.all.combined$celltype.sample==paste("posterior", m, sep = "_"))>100 ){
+  clustermarkers_i <- FindMarkers(testing.all.combined, ident.1 = paste("anterior", m, sep = "_"), ident.2 = paste("posterior", m, sep = "_"), logfc.threshold = 0.25, only.pos = FALSE)
   clustermarkers_i$diff_exp <- (clustermarkers_i$pct.1/clustermarkers_i$pct.2)
   
-  clustermarkers_i <- clustermarkers_i[order(-(abs(clustermarkers_i$avg_log2FC))), ]
-top50_genes <- rownames(clustermarkers_i)[1:50]
-top50_genes <- data.frame(top50_genes)
-  top50_genes<-addGeneNamesTable(top50_genes,top50_genes$top50_genes,gene_master$obgene, gene_master$merge_desc)
+  newvals<-clustermarkers_i[clustermarkers_i$p_val_adj<0.01 & (clustermarkers_i$pct.1 >0.25 | clustermarkers_i$pct.2 >0.25) & abs(clustermarkers_i$avg_log2FC)>1.5,]
   
-  #print(top30_genes) #top30
-  p<-DotPlot(allcombined.celltypesample.order,features=top50_genes$top50_genes, cols = c("blue","red"), split.by = "orig.ident") + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(axis.text.y = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) + NoLegend() #top30
+  if (nrow(newvals)>0){
+  
+  newvals$obgene <- rownames(newvals)
+  newvals<-addGeneNamesTable(newvals,newvals$obgene,gene_master$obgene, gene_master$merge_desc)
+    
+#  clustermarkers_i <- clustermarkers_i[order(-(abs(clustermarkers_i$avg_log2FC))), ]
+#top50_genes <- newvals[order(-(newvals$diff_exp)), ]
+#top50_genes <- top_n(newvals, 50, diff_exp)
+#top50_genes <- top50_genes[order(-(top50_genes$diff_exp)),]
+top50_genes <- top_n(newvals, 50, abs(avg_log2FC))
+top50_genes <- top50_genes[order(-(abs(top50_genes$avg_log2FC))),]
+  
+DefaultAssay(testing.all.combined) <- 'SCT'  
+
+  p<-DotPlot(testing.all.combined, group.by = "seurat_clusters", features=rev(top50_genes$obgene), cols = c("#7CAE00","#00BFC4","#F8766D","#C77CFF"), split.by = "newlabels") + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(axis.text.y = element_text(size = 10)) + theme(legend.title = element_text(size = 6)) + theme(legend.text = element_text(size = 6)) #top30
   p<-replaceLabelsX(p,gene_master$obgene,gene_master$merge_desc)
   p <- p+ coord_flip()
-  #p <- p+ ggtitle(paste('topvbot top50 for ident', m, sep = " ")) 
-  print(p)  
-}
+  p <- p+ ggtitle(paste('antvpost top50 for cluster', m, sep = " ")) 
+  print(p) 
+  
+  } else if (nrow(newvals)==0){
+    plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+    text(x = 0.5, y = 0.5, paste("newvals data frame = empty for cluster", m, sep="_"), 
+     cex = 1.6, col = "black")
+    text <- paste("newvals data frame = empty for cluster", m, sep="_")
+    print(text)
+  }
+
+}}
 
 dev.off()
+
+# text plot source: https://stackoverflow.com/questions/19918985/r-plot-only-text
+
+ if (exists('clustermarkers_i')){
+      clustermarkers_i<-rbind(clustermarkers_i,newvals)
+      ids<-c(ids,g1,g2)
+    } else{
+      clustermarkers_i<-newvals
+      ids<-c(g1,g2)
+    }
 
 
 FeaturePlot(allcombined.celltypesample.order, features = top50_genes$top50_genes[1:5])
@@ -595,4 +709,37 @@ example.response$gene <- example.response$example.response
 example.response <- addGeneNamesTable(example.response, example.response$gene, example.response$gene, gene_master$merge_desc)
 top30_btwn <- head(example.response, n = 30)
 ```
+
+```{r}
+# renaming samples; source: https://www.biostars.org/p/9575691/
+all.combined.renamed <- all.combined
+table(all.combined.renamed@meta.data$orig.ident)
+all.combined.renamed@meta.data$newlabels <- "placeholder"
+table(all.combined.renamed@meta.data$newlabels)
+
+all.combined.renamed@meta.data$newlabels[which(all.combined.renamed@meta.data$orig.ident == "Sample1")] <- "posterior"
+table(all.combined.renamed@meta.data$newlabels)
+
+all.combined.renamed@meta.data$newlabels[which(all.combined.renamed@meta.data$orig.ident == "Sample2")] <- "anterior"
+all.combined.renamed@meta.data$newlabels[which(all.combined.renamed@meta.data$orig.ident == "Sample3")] <- "dorsal"
+all.combined.renamed@meta.data$newlabels[which(all.combined.renamed@meta.data$orig.ident == "Sample4")] <- "ventral"
+table(all.combined.renamed@meta.data$newlabels)
+table(all.combined@meta.data$orig.ident)
+
+all.combined <- all.combined.renamed
+
+DefaultAssay(all.combined) <- 'integrated'
+p1 <- DimPlot(all.combined, label = TRUE, repel = TRUE)
+p2 <- DimPlot(all.combined, group.by = "newlabels", cols = c("#7CAE00","#00BFC4","#F8766D","#C77CFF"), repel = TRUE)
+p3 <- DimPlot(all.combined, split.by = "newlabels", repel = TRUE, ncol = 2)
+table(all.combined@meta.data$newlabels)
+
+all.combined_sample <- all.combined
+Idents(all.combined_sample) <-all.combined$seurat_clusters
+id_cell <- table(Idents(all.combined_sample))
+id_runs <- table(all.combined$newlabels, Idents(all.combined_sample))
+barplot(id_cell, main = "cell # in each cluster", xlab = "cluster ID",cex.names = 0.8, ylim = c(0, 10000)) + theme(legend.position = "top")
+barplot(id_runs, main = "relationship between cluster ID and run representation", xlab = "cluster ID", ylab = "cells", col = c("#7CAE00","#00BFC4","#F8766D","#C77CFF"), legend = rownames(id_runs), beside=TRUE) + theme(legend.position = "top")
+```
+
 
