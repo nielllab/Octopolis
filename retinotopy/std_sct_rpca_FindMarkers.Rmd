@@ -1,0 +1,330 @@
+---
+title: "FindMarkers and plots for std and sct normalized RPCA integrated data"
+output: html_notebook
+---
+
+```{r, require = T}
+library(Seurat) # 
+library(Matrix)
+library(ggplot2)
+library(sctransform)
+library(stringr)
+library(cowplot) # used for CCA
+library(patchwork) # used for CCA
+library(dplyr) # used for print markers
+library(here) # notes path for easy access in commands
+library(scCustomize)
+options("SCpubr.verbose" = FALSE)
+library(SCpubr)
+library(tidyverse)
+library(ggplot2)
+library(future)
+options(future.globals.maxSize = 10000 * 1024^2)
+plan("multisession")
+plan()
+```
+
+
+### Functions for changing gene names on figures, etc.
+```{r}
+
+# function to add gene names to data table
+# assumes first column of table is G gene
+# uses master list with gene name in 1st column, G gene in 3rd column
+addGeneNamesTable<- function(data,geneID, gene, desc){ # a little redundant to send in geneID but this solves the problem that different objects name it differently
+  data$GeneName <- '' # create empty column
+  for (i in 1:nrow(data)){
+    #ggene = data$gene[[i]] #cluster markers
+    obgene = geneID[[i]] # individual cluster markers
+    #ggene = data$Feature[[i]] #dimheatmap
+    #ggene = data$feature[[i]] #viz dim loadings
+    loc <- which(gene ==obgene)
+    if (length(loc)>0) {  # if something is found
+      data$GeneName[[i]] <- desc[loc[1]] # if multiple found, use 1st one
+    }
+  }
+  
+  data
+}
+
+replaceLabelsX <- function(p,gene,desc){
+  pp<- ggplot_build(p)
+  oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x$breaks
+  newxlabels = oldxlabels
+  for (i in 1:length(oldxlabels)){
+    loc<-which(gene==(oldxlabels[[i]]))
+    if (length(loc)>0){
+      newxlabels[[i]] = paste(oldxlabels[[i]], "-", desc[[loc[1]]])
+      newxlabels[[i]] = substr(newxlabels[[i]],1,100)}}
+  p<- p + scale_x_discrete(labels = newxlabels)
+}
+
+replaceLabelsY <- function(p,gene,desc){
+  pp<- ggplot_build(p)
+  oldylabels = ggplot_build(p)$layout$panel_params[[1]]$y$breaks
+  newylabels = oldylabels
+  for (i in 1:length(oldylabels)){
+    loc<-which(gene==(oldylabels[[i]]))
+    if (length(loc)> 0) {
+      newylabels[[i]] = paste(oldylabels[[i]], "-", desc[[loc[1]]])
+      newylabels[[i]] = substr(newylabels[[i]],1,100)}}
+  p<- p + scale_y_discrete(labels = newylabels)
+}
+
+shorten <- function(x)
+{
+  stringr::str_trunc(x, 50)
+}
+
+```
+
+
+
+
+
+### Reading in GeneIDs table, shortening the number of characters in merge_desc column
+```{r}
+
+gene_master <- read_csv(here("data","GeneIDs.csv"))
+
+gene_master <- gene_master %>% mutate(short_merge = shorten(merge_desc))
+```
+
+
+
+### Renaming samples to reflect morphology
+```{r}
+
+topo_sct$celltype.sample <- paste(topo_sct$sample,topo_sct$seurat_clusters,sep="_")
+# this sets identities to the strings
+
+
+# renaming samples; source: https://www.biostars.org/p/9575691/
+topo_sct.renamed <- topo_sct
+table(topo_sct.renamed@meta.data$orig.ident)
+topo_sct.renamed@meta.data$newlabels <- "placeholder"
+table(topo_sct.renamed@meta.data$newlabels)
+
+topo_sct.renamed@meta.data$newlabels[which(topo_sct.renamed@meta.data$orig.ident == "left")] <- "posterior"
+table(topo_sct.renamed@meta.data$newlabels)
+
+topo_sct.renamed@meta.data$newlabels[which(topo_sct.renamed@meta.data$orig.ident == "right")] <- "anterior"
+topo_sct.renamed@meta.data$newlabels[which(topo_sct.renamed@meta.data$orig.ident == "top")] <- "dorsal"
+topo_sct.renamed@meta.data$newlabels[which(topo_sct.renamed@meta.data$orig.ident == "bottom")] <- "ventral"
+table(topo_sct.renamed@meta.data$newlabels)
+table(topo_sct.renamed@meta.data$orig.ident)
+
+topo_sct <- topo_sct.renamed
+
+topo_sct$celltype.sample <- paste(topo_sct$newlabels,topo_sct$seurat_clusters,sep="_")
+Idents(topo_sct)<-"celltype.sample"
+```
+
+
+
+### topo_sct SCT normalize, RPCA integration loop through clusters comparing ventral and dorsal
+```{r}
+# loop over all clusters and find markers separating top and bottom
+# need to have set up sample + celltype idents above
+
+#rm(allMarkers, allMarkers_names)
+
+#topo_sct <- readRDS(here("data","fil_sct_RPCA_integrated.RDS"))
+
+markerNames <- tibble(p_val = NA, avg_log2FC = NA, pct.1 = NA, pct.2 = NA, p_val_adj = NA, GeneName = NA)
+
+#topo_sct <- PrepSCTFindMarkers(topo_sct)
+
+#topo_sct[["SCT"]] <- JoinLayers(topo_sct[["SCT"]])
+
+#columns <- colnames(markerNames)
+
+for (i in 0:length(unique(topo_sct$seurat_clusters))){
+#for (i in 0:0){
+  # create strings for top and bottom cluster based on loop index
+  g1<-paste("ventral",i,sep="_")
+  g2<- paste("dorsal",i,sep="_")
+  # check to see if there's enough cells in this cluster+sample!
+  if (sum(topo_sct$celltype.sample==g1)>10 & sum(topo_sct$celltype.sample==g2)>10 ){
+    # find markers
+    i <-FindMarkers(topo_sct, ident.1 = g1, ident.2 =g2, verbose = TRUE)
+                         #, only.pos = TRUE)
+    # relabel with gene names
+    markerNames<-addGeneNamesTable(i,row.names(i),gene_master$obgene,gene_master$short_merge)
+    write_tsv(markerNames,here("outputs",paste(g1,g2, "markers_sct_RPCA.tsv")))
+    newvals<-markerNames[markerNames$p_val_adj<0.01 & (markerNames$pct.1 >0.25 | markerNames$pct.2 >0.25),]
+    if (exists('allMarkers')){
+      allMarkers<-rbind(allMarkers,newvals)
+    } else{
+      allMarkers<-newvals
+    }
+  }
+  #head(markerNames, n=10)
+  print(head(markerNames,n=10))
+}
+
+```
+
+### topo sct normalize, RPCA integration filtered allMarkers
+```{r}
+allMarkers_names <- allMarkers %>% 
+  distinct(GeneName, .keep_all = TRUE) %>% 
+  rownames_to_column() %>% 
+  unite(ob_name, rowname, GeneName, remove = FALSE) %>% 
+  filter(p_val_adj <= 0.001)
+
+write_tsv(allMarkers_names, here("outputs","allMarkers_topo_sct_RPCA_int.tsv"))
+
+genes <- allMarkers_names %>% 
+  select(rowname, ob_name)
+
+
+  
+lac_ten <- FeaturePlot_scCustom(topo_sct, c("obimac0021926", "obimac0014032", "obimac0032954"), order = TRUE, reduction = "umap.sct_int_rpca")
+lac_ten
+
+ggsave(here('outputs','20241108_lact_tenur_genes_sct.pdf'), plot = lac_ten, device = pdf, width = 14, height = 14, unit = 'in')
+
+lac_ten_dot <- DotPlot_scCustom(topo_sct, c("obimac0021926", "obimac0014032", "obimac0032954"))
+lac_ten_dot
+
+ggsave(here('outputs','20241108_lact_tenur_genes_dot_sct.pdf'), plot = lac_ten_dot, device = pdf, width = 14, height = 28, unit = 'in')
+
+```
+
+
+
+### Marker dot plots by cluster
+
+```{r}
+Idents(topo_sct) = "seurat_clusters"
+
+#DotPlot_scCustom(topo_sct, genes$rowname, group.by = "seurat_clusters", flip_axes = TRUE)
+
+p<-DotPlot_scCustom(topo_sct, genes$rowname, group.by = "seurat_clusters") + RotatedAxis() + theme(axis.text.x = element_text(size = 6)) + theme(axis.text.y = element_text(size = 6)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) #+ NoLegend() 
+  p<-replaceLabelsX(p,gene_master$obgene,gene_master$short_merge)
+  p <- p+ coord_flip()
+ # p <- p+ ggtitle(paste('(avg_log2FC) top50 for cluster', m, sep = " ")) 
+
+p
+
+ggsave(here('outputs','20241108_sct_rpca_all_genes_by_cluster.pdf'), plot = p, device = pdf, width = 14, height = 14, unit = 'in')
+
+#gene_samp_dot <- DotPlot(topo_sct, genes, group.by = "seurat_clusters")
+#gene_samp_dot<-replaceLabelsX(gene_samp_dot,gene_master$obgene,gene_master$short_merge)
+#gene_samp_dot
+
+
+top10_genes <-  head(allMarkers_names$rowname,n=10)
+top10_genes_dot <- DotPlot_scCustom(topo_sct,features = top10_genes)  + RotatedAxis()
+top10_genes_dot<-replaceLabelsX(top10_genes_dot,gene_master$obgene,gene_master$short_merge)
+top10_genes_dot
+
+ggsave(here('outputs','20241108_sct_rpca_genes_cluster_dot.pdf'), plot = top10_genes_dot, device = pdf, width = 14, height = 14, unit = 'in')
+
+```
+
+### Marker dot plots by sample
+
+```{r}
+
+Idents(topo_sct) = "newlabels"
+
+#dvv <- subset(topo_sct, idents =  c("ventral", "dorsal"))
+
+#DotPlot_scCustom(dvv, genes$rowname, group.by = "sample", flip_axes = TRUE)
+
+DotPlot_scCustom(topo_sct, genes$rowname, group.by = "newlabels", flip_axes = TRUE)
+
+p<-DotPlot_scCustom(topo_sct, genes$rowname, group.by = "newlabels") + RotatedAxis() + theme(axis.text.x = element_text(size = 10)) + theme(axis.text.y = element_text(size = 10)) + theme(legend.title = element_text(size = 7)) + theme(legend.text = element_text(size = 7)) #+ NoLegend() 
+  p<-replaceLabelsX(p,gene_master$obgene,gene_master$short_merge)
+  p <- p+ coord_flip()
+ # p <- p+ ggtitle(paste('(avg_log2FC) top50 for cluster', m, sep = " ")) 
+
+p
+
+ggsave(here('outputs','20241108_sct_rpca_all_genes.pdf'), plot = p, device = pdf, width = 14, height = 20, unit = 'in')
+
+#gene_samp_dot <- DotPlot(topo_sct, genes, group.by = "newlabels")
+#gene_samp_dot
+#ggsave(here('outputs','20241107_sct_rpca_genes_samp_dot.pdf'), plot = gene_samp_dot, device = pdf, width = 14, height = 14, unit = 'in')
+
+
+top10_genes_sample_dot <- DotPlot_scCustom(topo_sct, features = top10_genes) + RotatedAxis()
+
+top10_genes__sample_dot <-replaceLabelsX(top10_genes_dot,gene_master$obgene,gene_master$short_merge)
+
+
+top10_genes_sample_dot
+ggsave(here('outputs','20241108_sct_rpca_top10_genes_samp_dot.pdf'), plot = top10_genes_sample_dot, device = pdf, width = 14, height = 14, unit = 'in')
+
+
+```
+
+
+### save out sct rpca dataset
+```{r}
+
+#saveRDS(topo_sct, here("data","fil_sct_rpca_clustered.RDS"))
+
+```
+
+
+### Songco-Casey cell class markers
+
+```{r}
+
+Idents(topo_sct) = "seurat_clusters"
+
+ol_markers <- read_tsv(here("data","Songco_Casey_etal_2022_cluster_markers.tsv"), col_names = c("gene","obim"))
+ol_markers <- ol_markers %>%
+  mutate(desc = gene, .keep = 'all')
+
+#whole_ol_class_markers<- c('elav|syt|dat|vglut|slc|chat|vacht|orc|tyrbh|gad')
+
+#non_neuron_markers <- ol_markers %>% filter(., c('pcna|ache|cola|hspg|svep|glul|ob02586'))
+#genes.to.label = c(
+
+whole_ol_class_markers<- c('elav|syt|dat|vglut|slc|chat|vacht|orc|tyrbh|gad')
+whole_ol_class_markers_txt<- str_replace_all(whole_ol_class_markers, fixed("|"), ",'")
+whole_ol_class_markers_list<- c('elav','syt','dat','vglut','slc','chat','vacht','orc','tyrbh','gad')
+
+mini_whole_ol_class_markers_list<- c('syt','dat','slc','vacht','orc','tyrbh')
+mini_whole_ol_class_markers<- c('syt|dat|slc|vacht|orc|tyrbh')
+
+mini_whole_ol_class_markers_v<- as_vector(mini_whole_ol_class_markers_list)
+#format_csv(as.data.frame(whole_ol_class_markers), '|')
+major_class_genes_obims<- ol_markers %>% 
+  filter(str_detect(gene, whole_ol_class_markers)) %>% 
+  select(gene, obim)
+
+major_class_genes_obims_ordered_wider<- major_class_genes_obims %>%
+  arrange(factor(gene, levels = whole_ol_class_markers_list)) %>% 
+  pivot_wider(names_from = gene, values_from = obim) %>% as_vector()
+
+major_class_genes<- major_class_genes_obims %>% select(gene)
+major_class_genes_v<- as_vector(major_class_genes)
+
+major_class_obim<- major_class_genes_obims %>% select(obim)
+major_class_obim_v<- as_vector(major_class_obim)
+
+mini_major_class_ordered_wider<- major_class_genes_obims %>%
+  filter(str_detect(gene, mini_whole_ol_class_markers)) %>%
+  filter(!str_detect(gene, 'syt4/11')) %>% 
+  arrange(factor(gene, levels = mini_whole_ol_class_markers_list)) %>% 
+  pivot_wider(names_from = gene, values_from = obim) %>% as_vector()
+
+
+  
+Iterate_FeaturePlot_scCustom(topo_sct, features = major_class_genes_obims_ordered_wider, file_name = here("outputs",'songco-casey_6_neuron_class_markers_11_sct_rpca'),file_type = '.pdf', single_pdf = TRUE, features_per_page = 11)
+
+Iterate_FeaturePlot_scCustom(topo_sct, features = mini_major_class_ordered_wider, file_name = here("outputs",'songco-casey_fig2_6_neuron_class_markers_6_sct_rpca'), file_type = '.pdf', single_pdf = TRUE, features_per_page = 12)
+
+
+dp<- DotPlot_scCustom(topo_sct,features = major_class_genes_obims_ordered_wider, cluster.idents = TRUE, group.by = "newlabels", flip_axes = FALSE)
+
+dp
+
+ggsave(here('outputs','20241108_mini_major_classes_sct_rpca_by_sample_cluster.pdf'), plot = dp, device = pdf, width = 14, height = 7, unit = 'in')
+```
+
