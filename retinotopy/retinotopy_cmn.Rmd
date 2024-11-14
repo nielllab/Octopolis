@@ -30,6 +30,7 @@ library(here)
 library(Seurat)
 library(presto)
 library(scCustomize)
+library(ape)
 ```
 
 
@@ -54,6 +55,7 @@ addGeneNamesTable<- function(data,geneID, gene, desc){ # a little redundant to s
   data
 }
 
+#replaces gene name labels on x-axis
 replaceLabelsX <- function(p,gene,desc){
   pp<- ggplot_build(p)
   oldxlabels = ggplot_build(p)$layout$panel_params[[1]]$x$breaks
@@ -66,6 +68,7 @@ replaceLabelsX <- function(p,gene,desc){
   p<- p + scale_x_discrete(labels = newxlabels)
 }
 
+#replaces gene name labels on y-axis
 replaceLabelsY <- function(p,gene,desc){
   pp<- ggplot_build(p)
   oldylabels = ggplot_build(p)$layout$panel_params[[1]]$y$breaks
@@ -78,44 +81,144 @@ replaceLabelsY <- function(p,gene,desc){
   p<- p + scale_y_discrete(labels = newylabels)
 }
 
+
 shorten <- function(x)
 {
   stringr::str_trunc(x, 50)
 }
+
+# loop through multiple features in a table, plot them and relabel (doesn't work inside a function)
+FeaturePlotAll <- function(obj, marker.table, split,fname){
+  if (length(fname)>0){
+    pdf(fname) 
+  }
+  markers = row.names(marker.table)
+  for (i in 1:length(markers)){
+    i
+    if(markers[i]%in% rownames(obj)){
+      p<-FeaturePlot(obj, features = markers[i], split.by=split) + labs(title = paste(markers[i],'_',shorten(marker.table[i,]$GeneName)))
+      print(p)
+    }
+  }
+  if(length(fname)>0){
+    dev.off()
+  }
+}
+
+
 
 ```
 
 ```{r}
 #read Seurat object (after clustering)
 
-obj <-readRDS("~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/filtered_SCTransform_clustered_topos.RDS")
+#create names for data files, so there's a record of what was read in
 
-#obj <-readRDS("~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/no_MT_filtered_SCTransform_clustered_topos.RDS")
+name.data<-"~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/umapLRTB_sct25d.rds"
+
+#name.data<-"~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/no_MT_filtered_SCTransform_clustered_topos.RDS"
+
+#name.data<-"umapLRTB_sct25d.rds"
+
+#name.data<-"~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/fil_std_RPCA_integrated.RDS"
+
+#name.data<-"~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/umapLR.sct15d.rds"
+
+obj <-readRDS(name.data)
 ```
 
+```{r}
+# rename samples
+obj$sample <- "placeholder"
+obj@meta.data$sample[which(obj@meta.data$orig.ident == "Sample1")] <- "posterior"
+obj@meta.data$sample[which(obj@meta.data$orig.ident == "Sample2")] <- "anterior"
+obj@meta.data$sample[which(obj@meta.data$orig.ident == "Sample3")] <- "dorsal"
+obj@meta.data$sample[which(obj@meta.data$orig.ident == "Sample4")] <- "ventral"
+```
 
 ```{r}
 # read gene names
-gene_master <- read_csv("~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/GeneIDs.csv")
-gene_master <- gene_master %>% mutate(short_merge = shorten(merge_desc))
+gene_master <- read_csv("~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/GeneIDs2.csv")
+
+mainGenes <- read.csv("~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/mainGenes.csv")
+mappingGenes <- read.csv("~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/Markers.csv")
+
 ```
 
 ```{r}
+DefaultAssay(obj) <- "SCT"
+```
+
+```{r}
+# select only anterior posterior (makes some things easier)
+Idents(obj)<-"sample"
+#antpost = subset(obj, idents = c('dorsal','ventral'))
+antpost = subset(obj, idents = c('anterior','posterior'))
+```
+
+```{r}
+fname = "~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/cca_sct_clusters.pdf"
+pdf(fname)
+Idents(obj)<-'seurat_clusters'
+p<-DimPlot(obj, label=TRUE)
+print(p)
+p
+```
+
+```{r}
+Idents(obj)<-'sample'
+p<-DimPlot(obj, label=TRUE)
+print(p)
+p
+```
+
+
+```{r}
+Idents(obj)<-"seurat_clusters"
+p<-DotPlot(obj,features =mainGenes$obgene) + RotatedAxis() + theme(text = element_text(size = 20)) 
+p<-replaceLabelsX(p,mainGenes$obgene,mainGenes$gene)
+print(p)
+dev.off()
+p
+```
+
+```{r}
+obj<-BuildClusterTree(obj, reorder.numeric=TRUE)
+```
+
+
+```{r}
+DefaultAssay(obj) <- "SCT"
 obj<-PrepSCTFindMarkers(obj)
 ```
 
 ```{r}
-# create identies based on boolean combination of properties
+# find bulk anterior posterior differences
+Idents(obj)<-"sample"
+markers<-FindMarkers(obj, ident.1 = 'dorsal', ident.2 ='ventral', verbose = TRUE)
+markerNames<-addGeneNamesTable(markers,row.names(markers),gene_master$obgene,gene_master$merge_desc)
+antpost.top<-markerNames[markerNames$p_val_adj<0.001 & (markerNames$pct.1 >0.1 | markerNames$pct.2 >0.1) & abs(markerNames$avg_log2FC)>1,]
+print(antpost.top)
+```
 
-# this string contains the values you want (e.g. bottom_5 for bottom sample, cluster 5)
-obj$celltype.sample <- paste(obj$sample,obj$seurat_clusters,sep="_")
-# this sets identities to the strings
-Idents(obj)<-"celltype.sample"
-# find markers based on values you want by selecting appropriate identity strings
-markers<-FindMarkers(obj, ident.1 = "bottom_0", ident.2 = "top_0", verbose = FALSE)
-head(markers,n=10)
+
+```{r}
+#featuremap all bulk anterior-posterior
+
+fname = "~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/cca_sct_bulk_dorsvent_dotplot.pdf"
+
+pdf(fname)
+p<-DotPlot(obj,features =row.names(antpost.top)) + RotatedAxis() + theme(axis.text.x = element_text(size = 8))+ theme(axis.text.y = element_text(size = 8)) 
+p<-replaceLabelsX(p,gene_master$obgene,gene_master$merge_desc)
+print(p)
+dev.off()
+
+fname = "~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/cca_sct_bulk_dorsvent_feature.pdf"
+FeaturePlotAll(antpost, antpost.top, "sample",fname)
+
 
 ```
+
 ```{r}
 # loop over all clusters and find markers separating top and bottom
 # need to have set up sample + celltype idents above
@@ -125,22 +228,32 @@ rm(ids)
 obj$celltype.sample <- paste(obj$sample,obj$seurat_clusters,sep="_")
 # this sets identities to the strings
 Idents(obj)<-"celltype.sample"
+pdf(file = "~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/cca_sct_dors_vent_cluster_dotplot.pdf", width = 10, height = 10)
 
-for (i in 0:length(unique(obj$seurat_clusters))){
-#for (i in 0:0){
+for (i in 0:(length(unique(obj$seurat_clusters))-1)){
+#for (i in 11:11){
   # create strings for top and bottom cluster based on loop index
-  g1<-paste("left",i,sep="_")
-  g2<- paste("right",i,sep="_")
+  g1<-paste("dorsal",i,sep="_")
+  g2<- paste("ventral",i,sep="_")
+  Idents(obj)<-"celltype.sample"
   # check to see if there's enough cells in this cluster+sample!
   if (sum(obj$celltype.sample==g1)>100 & sum(obj$celltype.sample==g2)>100 ){
     # find markers
-    markers<-FindMarkers(obj, ident.1 = g1, ident.2 =g2, verbose = TRUE)
+    markers<-FindMarkers(obj, ident.1 = g1, ident.2 =g2, verbose = TRUE, min.pct=0.25)
     # relabel with gene names
     markerNames<-addGeneNamesTable(markers,row.names(markers),gene_master$obgene,gene_master$merge_desc)
     #print top of list
-    print(head(markerNames,n=10))
+    Idents(obj)<-"seurat_clusters"
+    
     # keep markers that meet criteria (min p-value, fold-change, exp level)
-    newvals<-markerNames[markerNames$p_val_adj<0.01 & (markerNames$pct.1 >0.25 | markerNames$pct.2 >0.25) & abs(markerNames$avg_log2FC)>2,]
+    newvals<-markerNames[markerNames$p_val_adj<0.01 & (markerNames$pct.1 >0.25 | markerNames$pct.2 >0.25) & abs(markerNames$avg_log2FC)>1,]
+   if (nrow(newvals)>0) {
+     p<-DotPlot(obj, features = row.names(newvals), split.by="sample", cols="Blues",scale=FALSE) + RotatedAxis() + theme(axis.text.x = element_text(size = 4))+ theme(axis.text.y = element_text(size = 8))
+    p<-replaceLabelsX(p,gene_master$obgene,gene_master$merge_desc)
+    print(p)
+    print(newvals)
+   }
+    
     if (exists('allMarkers')){
       allMarkers<-rbind(allMarkers,newvals)
       ids<-c(ids,g1,g2)
@@ -151,60 +264,97 @@ for (i in 0:length(unique(obj$seurat_clusters))){
   }
   
 }
+dev.off()
 ```
 
 
 ```{r}
-Idents(obj)<-"sample"
-p<-DotPlot(obj,idents = c('right','left'),features = row.names(head(allMarkers,n=100))) + RotatedAxis() + theme(text = element_text(size = 1)) +NoLegend()
-p<-replaceLabelsX(p,gene_master$obgene,gene_master$short_merge)
-p
-
-```
-
-```{r}
-Idents(obj)<-"sample"
-p<-DotPlot(obj,features = row.names(head(allMarkers,n=100))) + RotatedAxis() + theme(text = element_text(size = 20)) +NoLegend()
-p<-replaceLabelsX(p,gene_master$obgene,gene_master$short_merge)
-p
+fname = "~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/cca_sct_dors_vent_clusters_fmap.pdf"
+FeaturePlotAll(antpost, allMarkers, "sample",fname)
 
 ```
 
 
 ```{r}
-Idents(obj)<-"celltype.sample"
-p<-DotPlot(obj,idents = ids,features = row.names(head(allMarkers,n=100))) + RotatedAxis() + theme(text = element_text(size = 20))
-p<-replaceLabelsX(p,gene_master$obgene,gene_master$short_merge)
-p
-
-```
-```{r}
-Idents(obj)<-"celltype.sample"
-p<-DotPlot_scCustom(obj,idents = ids,features = row.names(head(allMarkers,n=100)), x_lab_rotate=TRUE) + theme(text = element_text(size = 20)) +NoLegend()
-p<-replaceLabelsX(p,gene_master$obgene,gene_master$short_merge)
+#dotplot first 50 markers
+Idents(antpost)<-"seurat_clusters"
+p<-DotPlot(antpost, features = row.names(allMarkers[1:50,]),split.by="sample", cols="Blues",scale=FALSE) + RotatedAxis() + theme(axis.text.x = element_text(size = 4))+ theme(axis.text.y = element_text(size = 4))
+p<-replaceLabelsX(p,gene_master$obgene,gene_master$merge_desc)
 p
 ```
 
 ```{r}
-Idents(obj)<-"sample"
-p<-DotPlot_scCustom(obj, idents = c('left','right'), split.by = 'seurat_clusters',cols = "Blues", features = row.names(head(allMarkers,n=100))) + RotatedAxis() + theme(axis.text.x = element_text(size = 8))+ theme(axis.text.y = element_text(size = 8)) +NoLegend()
-p<-replaceLabelsX(p,gene_master$obgene,gene_master$short_merge)
-p
-
+#teneurin / latrophilin dotplot
+genes = c('obimac0021926','obimac0005907','obimac0020133')
+p<-DotPlot(obj,features = genes, scale = FALSE) + RotatedAxis() + theme(axis.text.x = element_text(size = 8))+ theme(axis.text.y = element_text(size = 8))
+#p<-replaceLabelsX(p,gene_master$obgene,gene_master$short_merge)
+p<- p+ coord_flip()
+print(p)
 ```
 
 ```{r}
-Idents(obj)<-"sample"
-leftright = subset(obj, idents = c('left','right'))
-```
-
-
-```{r}
-markers = row.names(head(allMarkers,n=100))
-for (i in 1:length(markers)){
-  p<-FeaturePlot(leftright, features = markers[i], split.by = "sample")
+#teneurin / latrophilin feature map
+genes = c('obimac0021926','obimac0005907','obimac0020133')
+for (i in 1:length(genes)){
+  p<-FeaturePlot(antpost, features = genes[i], split.by = "sample")
   print(p)
 }
 
 ```
+
+```{r}
+#find markers for mysterious posterior only cluster
+antonly.clust = 2
+Idents(obj)<-"seurat_clusters"
+antonly.markers= FindMarkers(obj, ident.1 = antonly.clust)
+antonly.top<-antonly.markers[antonly.markers$p_val_adj<0.01 & antonly.markers$pct.1 >0.25  & antonly.markers$avg_log2FC>1,]
+antonly.top<-addGeneNamesTable(antonly.top,row.names(antonly.top),gene_master$obgene,gene_master$merge_desc)
+print(antonly.top)
+```
+
+
+```{r}
+#plot figures for anterior only cluster
+
+fname = "~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/cca_sct_posterior_dotplot.pdf"
+
+pdf(fname)
+p<-DotPlot(obj,features =row.names(antonly.top[1:7,])) + RotatedAxis() + theme(axis.text.x = element_text(size = 8))+ theme(axis.text.y = element_text(size = 8))
+p<-replaceLabelsX(p,gene_master$obgene,gene_master$merge_desc)
+print(p)
+dev.off()
+
+
+#featuremap anterior only markers
+fname = "~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/cca_sct_posterior_fmap.pdf"
+p<-FeaturePlotAll(obj, antonly.top[1:7,], NULL, fname)
+
+```
+
+
+
+```{r}
+#do bulk analysis of clusters
+agg <- AggregateExpression(obj, group.by = c("sample","seurat_clusters"), return.seurat = TRUE)
+
+```
+
+```{r}
+p <- CellScatter(obj, "anterior_g2", "posterior_g2", highlight = genes)
+```
+
+
+
+```{r}
+Idents(obj)<-"sample"
+p<-DotPlot(obj,features = genes) + RotatedAxis() + theme(text = element_text(size = 20)) 
+p<-replaceLabelsX(p,gene_master$obgene,gene_master$short_merge)
+print(p)
+
+```
+```{r}
+plots <- VlnPlot(obj, features = genes,  group.by = "sample")
+
+```
+
 
