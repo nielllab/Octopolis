@@ -141,7 +141,11 @@ obj@meta.data$sample[which(obj@meta.data$orig.ident == "Sample4")] <- "ventral"
 gene_master <- read_csv("~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/GeneIDs2.csv")
 
 mainGenes <- read.csv("~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/mainGenes.csv")
+
 mappingGenes <- read.csv("~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/Markers.csv")
+
+antpost_genes <- read.csv("~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/anterior_posterior_markers_cmn.csv")
+row.names(antpost_genes)<-antpost_genes$obgene
 
 ```
 
@@ -329,6 +333,20 @@ dev.off()
 fname = "~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/cca_sct_posterior_fmap.pdf"
 p<-FeaturePlotAll(obj, antonly.top[1:7,], NULL, fname)
 
+```
+```{r}
+fname = "~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/candidate_markers_dotplot.pdf"
+Idents(obj)<-"seurat_clusters"
+pdf(fname)
+p<-DotPlot(obj,features =antpost_genes$obgene, split.by="sample", cols="Blues") + RotatedAxis() + theme(axis.text.x = element_text(size = 4))+ theme(axis.text.y = element_text(size = 4))
+p<-replaceLabelsX(p,gene_master$obgene,gene_master$merge_desc)
+print(p)
+dev.off()
+
+
+#featuremap anterior only markers
+fname = "~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/candidate_markers_fmap.pdf"
+p<-FeaturePlotAll(antpost, antpost_genes, "sample", fname)
 ```
 
 
