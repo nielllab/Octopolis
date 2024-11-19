@@ -335,6 +335,7 @@ p<-FeaturePlotAll(obj, antonly.top[1:7,], NULL, fname)
 
 ```
 ```{r}
+#plot markers extracted from a spreadsheet (in table antpost_genes)
 fname = "~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/candidate_markers_dotplot.pdf"
 Idents(obj)<-"seurat_clusters"
 pdf(fname)
@@ -343,8 +344,6 @@ p<-replaceLabelsX(p,gene_master$obgene,gene_master$merge_desc)
 print(p)
 dev.off()
 
-
-#featuremap anterior only markers
 fname = "~/Google Drive/retinotopy data/_2024_optic_lobe_topographic_single_cell_RNAseq/data/candidate_markers_fmap.pdf"
 p<-FeaturePlotAll(antpost, antpost_genes, "sample", fname)
 ```
